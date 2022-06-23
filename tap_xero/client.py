@@ -256,6 +256,7 @@ class XeroClient():
             response_meta = json.loads(response.text,
                                     object_hook=_json_load_object_hook,
                                     parse_float=decimal.Decimal)
+            xero_resource_name = xero_resource_name.split("/")[0]
             response_body = response_meta.pop(xero_resource_name)
             return response_body
 

@@ -1,0 +1,57 @@
+{
+  "type": [
+    "null",
+    "object"
+  ],
+  "properties": {
+    "ReportID": {
+      "type": [
+        "string"
+      ]
+    },
+    "ReportName": {
+      "type": [
+        "string"
+      ]
+    },
+    "ReportTitle": {
+      "type": [
+        "string"
+      ]
+    },
+    "ReportType": {
+      "type": [
+        "string"
+      ]
+    },
+    "ReportTitles": {
+      "type": [
+        "string"
+      ]
+    },
+    "ReportDate": {
+      "type": [
+        "string"
+      ]
+    },
+    "UpdatedDateUTC": {
+      "type": [
+        "string"
+      ]
+    },
+    "Fields": {
+      "type": [
+        "string"
+      ]
+    },
+    "Rows": {
+      "type": [
+        "string"
+      ]
+    }
+  },
+  "additionalProperties": false,
+  "tap_schema_dependencies": [
+    "validation_errors"
+  ]
+}

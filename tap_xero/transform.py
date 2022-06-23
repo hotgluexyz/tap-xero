@@ -73,3 +73,9 @@ def format_journals(journals):
     for journal in journals:
         if journal.get('JournalDate') == '/Date(0+0000)/':
             journal['JournalDate'] = '1970-01-01T00:00:00.000000Z'
+
+
+def format_profit_and_loss(reports):
+    for report in reports:
+        if report.get('ReportTitles'):
+            report['ReportTitle'] = " ".join(report.get('ReportTitles'))

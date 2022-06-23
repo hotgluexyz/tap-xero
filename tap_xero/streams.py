@@ -5,6 +5,9 @@ from singer import metadata, metrics, Transformer
 from singer.utils import strptime_with_tz
 import backoff
 from . import transform
+from datetime import datetime, timedelta
+from dateutil.relativedelta import relativedelta
+from dateutil.parser import parse
 
 LOGGER = singer.get_logger()
 FULL_PAGE_SIZE = 100
@@ -111,6 +114,35 @@ class PaginatedStream(Stream):
             if not records or len(records) < FULL_PAGE_SIZE:
                 break
             curr_page_num += 1
+        ctx.clear_offsets(self.tap_stream_id)
+        ctx.set_bookmark(bookmark, max_updated)
+        ctx.write_state()
+
+
+class ReportsStream(Stream):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    def sync(self, ctx):
+        bookmark = [self.tap_stream_id, self.bookmark_key]
+        start = ctx.update_start_date_bookmark(bookmark)
+        max_updated = start
+        start = parse(start)
+        date = datetime(start.year, start.month, 1)
+        dates = []
+        while date<datetime.now():
+            dates.append(date)
+            date += relativedelta(months=1)
+        for date in dates:
+            self.filter_options["fromDate"] = date.strftime("%Y-%m-%d")
+            end = (date + relativedelta(months=1)) - timedelta(1)
+            self.filter_options["toDate"] = end.strftime("%Y-%m-%d")
+            stream_id = f"Reports/{self.tap_stream_id}"
+            records = _make_request(ctx, stream_id, self.filter_options)
+            if records:
+                self.format_fn(records)
+                self.write_records(records, ctx)
+                max_updated = records[-1][self.bookmark_key]
         ctx.clear_offsets(self.tap_stream_id)
         ctx.set_bookmark(bookmark, max_updated)
         ctx.write_state()
@@ -235,5 +267,8 @@ all_streams = [
     # LINKED TRANSACTIONS STREAM
     # This endpoint is not paginated, but can do some manual filtering
     LinkedTransactions("linked_transactions", ["LinkedTransactionID"], bookmark_key="UpdatedDateUTC"),
+
+    # REPORTS STREAM
+    ReportsStream("profit_and_loss", ["ReportTitle"], bookmark_key="UpdatedDateUTC", format_fn=transform.format_profit_and_loss),
 ]
 all_stream_ids = [s.tap_stream_id for s in all_streams]
