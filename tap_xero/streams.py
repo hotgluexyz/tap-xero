@@ -8,6 +8,7 @@ import backoff
 from . import transform
 from dateutil.parser import parse
 from dateutil.relativedelta import relativedelta
+from datetime import timedelta
 from tap_xero.client import XeroUnauthorizedError
 
 
@@ -87,6 +88,7 @@ class BookmarkedStream(Stream):
     def sync(self, ctx):
         bookmark = [self.tap_stream_id, self.bookmark_key]
         start = ctx.update_start_date_bookmark(bookmark)
+        start = (parse(start) + timedelta(seconds=1)).replace(tzinfo=None).isoformat()
         records = _make_request(ctx, self.tap_stream_id, dict(since=start))
         if records:
             self.format_fn(records)
