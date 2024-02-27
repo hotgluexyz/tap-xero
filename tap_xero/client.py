@@ -246,6 +246,8 @@ class XeroClient():
         headers = {"Accept": "application/json",
                    "Authorization": "Bearer " + self.access_token,
                    "Xero-tenant-id": self.tenant_id}
+        if params.get("headers"):
+            headers.update(params.pop("headers"))
         if self.user_agent:
             headers["User-Agent"] = self.user_agent
         if since:

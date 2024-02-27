@@ -184,6 +184,10 @@ class Journals(Stream):
         journal_number = ctx.get_bookmark(bookmark) or 0
         while True:
             filter_options = {"offset": journal_number}
+            if ctx.config.get("start_date"):
+                start_date = parse(ctx.config.get("start_date"))
+                filter_options['headers'] = {"If-Modified-Since": start_date.strftime("%Y-%m-%dT%H:%M:%SZ")}
+
             records = _make_request(ctx, self.tap_stream_id, filter_options)
             logging.info("Got {} records: {}".format(
                 len(records), records
