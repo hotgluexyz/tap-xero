@@ -8,6 +8,7 @@ import backoff
 from . import transform
 from dateutil.parser import parse
 from dateutil.relativedelta import relativedelta
+from tap_xero.client import XeroUnauthorizedError
 
 
 LOGGER = singer.get_logger()
@@ -39,6 +40,11 @@ def _make_request(ctx, tap_stream_id, filter_options=None, attempts=0):
     filter_options = filter_options or {}
     try:
         return _request_with_timer(tap_stream_id, ctx.client, filter_options)
+    except XeroUnauthorizedError as e:
+        if attempts == 1:
+            raise e
+        ctx.refresh_credentials()
+        return _make_request(ctx, tap_stream_id, filter_options, attempts + 1)
     except HTTPError as e:
         if e.response.status_code == 401:
             if attempts == 1:
