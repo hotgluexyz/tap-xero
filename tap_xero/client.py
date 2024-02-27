@@ -185,7 +185,7 @@ class XeroClient():
         self.access_token = None
 
     def refresh_credentials(self, config, config_path):
-
+        LOGGER.info("Refreshing OAuth credentials")
         header_token = b64encode((config["client_id"] + ":" + config["client_secret"]).encode('utf-8'))
 
         headers = {
@@ -203,6 +203,7 @@ class XeroClient():
             raise_for_error(resp)
         else:
             resp = resp.json()
+            LOGGER.info(f"Completed refresh of OAuth tokens. response={resp}")
 
             # Write to config file
             config['refresh_token'] = resp["refresh_token"]
@@ -245,6 +246,8 @@ class XeroClient():
         headers = {"Accept": "application/json",
                    "Authorization": "Bearer " + self.access_token,
                    "Xero-tenant-id": self.tenant_id}
+        if params.get("headers"):
+            headers.update(params.pop("headers"))
         if self.user_agent:
             headers["User-Agent"] = self.user_agent
         if since:

@@ -9,6 +9,8 @@ from . import transform
 from dateutil.parser import parse
 from dateutil.relativedelta import relativedelta
 from datetime import timedelta
+from tap_xero.client import XeroUnauthorizedError
+
 
 LOGGER = singer.get_logger()
 FULL_PAGE_SIZE = 100
@@ -39,6 +41,11 @@ def _make_request(ctx, tap_stream_id, filter_options=None, attempts=0):
     filter_options = filter_options or {}
     try:
         return _request_with_timer(tap_stream_id, ctx.client, filter_options)
+    except XeroUnauthorizedError as e:
+        if attempts == 1:
+            raise e
+        ctx.refresh_credentials()
+        return _make_request(ctx, tap_stream_id, filter_options, attempts + 1)
     except HTTPError as e:
         if e.response.status_code == 401:
             if attempts == 1:
@@ -179,6 +186,10 @@ class Journals(Stream):
         journal_number = ctx.get_bookmark(bookmark) or 0
         while True:
             filter_options = {"offset": journal_number}
+            if ctx.config.get("start_date"):
+                start_date = parse(ctx.config.get("start_date"))
+                filter_options['headers'] = {"If-Modified-Since": start_date.strftime("%Y-%m-%dT%H:%M:%SZ")}
+
             records = _make_request(ctx, self.tap_stream_id, filter_options)
             logging.info("Got {} records: {}".format(
                 len(records), records
