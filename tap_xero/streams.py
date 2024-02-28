@@ -196,7 +196,7 @@ class Journals(Stream):
             if journal_numbers:
                 max_journal = max(journal_numbers)
                 #Adjust to 500k offset
-                starting_offset = max_journal - 500000
+                starting_offset = max_journal - int(ctx.config.get("journal_lookback_range",499900))
                 if starting_offset < 0:
                     starting_offset = 0
                 break    
