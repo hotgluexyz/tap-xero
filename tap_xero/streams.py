@@ -9,6 +9,8 @@ from . import transform
 from dateutil.parser import parse
 from dateutil.relativedelta import relativedelta
 from tap_xero.client import XeroUnauthorizedError
+from http.client import RemoteDisconnected
+from requests.exceptions import ConnectionError
 
 
 LOGGER = singer.get_logger()
@@ -33,7 +35,7 @@ class RateLimitException(Exception):
 
 
 @backoff.on_exception(backoff.expo,
-                      RateLimitException,
+                      (RateLimitException,RemoteDisconnected,ConnectionError),
                       max_tries=10,
                       factor=2)
 def _make_request(ctx, tap_stream_id, filter_options=None, attempts=0):
