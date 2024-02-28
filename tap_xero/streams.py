@@ -9,7 +9,6 @@ from . import transform
 from dateutil.parser import parse
 from dateutil.relativedelta import relativedelta
 from tap_xero.client import XeroUnauthorizedError
-import requests
 
 
 LOGGER = singer.get_logger()
