@@ -241,6 +241,9 @@ class XeroClient():
     @backoff.on_exception(retry_after_wait_gen, XeroTooManyInMinuteError, giveup=is_not_status_code_fn([429]), jitter=None, max_tries=3)
     def filter(self, tap_stream_id, since=None, **params):
         xero_resource_name = tap_stream_id.title().replace("_", "")
+        #override resource name for Journals with payments only stream.
+        if xero_resource_name == "JournalsPaymentsOnly":
+            xero_resource_name = "Journals"
         is_report = False
         if xero_resource_name.startswith("Reports"):
             is_report = True
@@ -255,7 +258,8 @@ class XeroClient():
             headers["User-Agent"] = self.user_agent
         if since:
             headers["If-Modified-Since"] = since
-
+        if tap_stream_id == "journals_payments_only":
+            params.update({"paymentsOnly":True})
         request = requests.Request("GET", url, headers=headers, params=params)
         response = self.session.send(request.prepare())
 
