@@ -8,6 +8,10 @@ import backoff
 from . import transform
 from dateutil.parser import parse
 from dateutil.relativedelta import relativedelta
+from tap_xero.client import XeroUnauthorizedError
+from http.client import RemoteDisconnected
+from requests.exceptions import ConnectionError,ReadTimeout,ChunkedEncodingError
+from urllib3.exceptions import ProtocolError
 
 
 LOGGER = singer.get_logger()
@@ -32,13 +36,18 @@ class RateLimitException(Exception):
 
 
 @backoff.on_exception(backoff.expo,
-                      RateLimitException,
+                      (RateLimitException,RemoteDisconnected,ConnectionError,ReadTimeout,ChunkedEncodingError,ProtocolError),
                       max_tries=10,
                       factor=2)
 def _make_request(ctx, tap_stream_id, filter_options=None, attempts=0):
     filter_options = filter_options or {}
     try:
         return _request_with_timer(tap_stream_id, ctx.client, filter_options)
+    except XeroUnauthorizedError as e:
+        if attempts == 1:
+            raise e
+        ctx.refresh_credentials()
+        return _make_request(ctx, tap_stream_id, filter_options, attempts + 1)
     except HTTPError as e:
         if e.response.status_code == 401:
             if attempts == 1:
@@ -178,6 +187,10 @@ class Journals(Stream):
         journal_number = ctx.get_bookmark(bookmark) or 0
         while True:
             filter_options = {"offset": journal_number}
+            if ctx.config.get("start_date"):
+                start_date = parse(ctx.config.get("start_date"))
+                filter_options['headers'] = {"If-Modified-Since": start_date.strftime("%Y-%m-%dT%H:%M:%SZ")}
+
             records = _make_request(ctx, self.tap_stream_id, filter_options)
             logging.info("Got {} records: {}".format(
                 len(records), records
@@ -190,6 +203,41 @@ class Journals(Stream):
                 ctx.write_state()
             if not records or len(records) < FULL_PAGE_SIZE:
                 break
+
+    def write_records(self, records, ctx):
+        """"Custom implementation from the write records method available in Stream class"""
+        stream = ctx.catalog.get_stream(self.tap_stream_id)
+        schema = stream.schema.to_dict()
+        lines_schema = schema["properties"].get("JournalLines", {}).get("items")
+        lines_schema["JournalID"] = schema["properties"]["JournalID"]
+        lines_stream_id = "{}_lines".format(self.tap_stream_id)
+        mdata = stream.metadata
+        try:
+            line_mdata = [i for i in mdata if "JournalLines" in i.get("breadcrumb", [])]
+        except IndexError:
+            line_mdata = None
+
+        if line_mdata:
+            singer.write_schema(
+                lines_stream_id,
+                lines_schema,
+                ["JournalLineID"]
+            )
+
+        if line_mdata is None:
+            line_mdata = []
+
+        for rec in records:
+            with Transformer() as transformer:
+                rec = transformer.transform(rec, schema, metadata.to_map(mdata))
+                singer.write_record(self.tap_stream_id, rec)
+            if "JournalLines" in rec and len(line_mdata) > 0 and ctx.config.get("journal_lines_stream") in ["true", True]:
+                for line in rec["JournalLines"]:
+                    with Transformer() as transformer:
+                        line["JournalID"] = rec["JournalID"]
+                        line = transformer.transform(line, lines_schema, metadata.to_map(line_mdata))
+                        singer.write_record(lines_stream_id, line)
+        self.metrics(records)
 
 
 class LinkedTransactions(Stream):
