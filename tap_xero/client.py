@@ -216,7 +216,7 @@ class XeroClient():
 
 
     @backoff.on_exception(backoff.expo, (json.decoder.JSONDecodeError, XeroInternalError,RemoteDisconnected,ConnectionError,ReadTimeout,ChunkedEncodingError,ProtocolError), max_tries=3)
-    @backoff.on_exception(retry_after_wait_gen, XeroTooManyInMinuteError, giveup=is_not_status_code_fn([429]), jitter=None, max_tries=3)
+    @backoff.on_exception(retry_after_wait_gen, XeroTooManyInMinuteError, giveup=is_not_status_code_fn([429,504]), jitter=None, max_tries=3)
     def check_platform_access(self, config, config_path):
 
         # Validating the authentication of the provided configuration
@@ -238,7 +238,7 @@ class XeroClient():
 
 
     @backoff.on_exception(backoff.expo, (json.decoder.JSONDecodeError, XeroInternalError,RemoteDisconnected,ConnectionError,ReadTimeout,ChunkedEncodingError,ProtocolError), max_tries=3)
-    @backoff.on_exception(retry_after_wait_gen, XeroTooManyInMinuteError, giveup=is_not_status_code_fn([429]), jitter=None, max_tries=3)
+    @backoff.on_exception(retry_after_wait_gen, XeroTooManyInMinuteError, giveup=is_not_status_code_fn([429,504]), jitter=None, max_tries=3)
     def filter(self, tap_stream_id, since=None, **params):
         xero_resource_name = tap_stream_id.title().replace("_", "")
         is_report = False
@@ -291,6 +291,9 @@ def raise_for_error(resp):
             elif error_code in (403, 401):
                 api_message = ERROR_CODE_EXCEPTION_MAPPING[error_code]["message"]
                 message = "HTTP-error-code: {}, Error: {}".format(error_code, api_message)
+            elif error_code == 504:
+                message = "HTTP-error-code: 504, Error: Gateway Timeout"
+                raise ReadTimeout(message)
             else:
                 # Forming a response message for raising custom exception
                 try:
