@@ -259,7 +259,7 @@ class XeroClient():
         if since:
             headers["If-Modified-Since"] = since
         if tap_stream_id == "journals_payments_only":
-            params.update({"paymentsOnly":True})
+            params.update({"paymentsOnly":'true'})
         request = requests.Request("GET", url, headers=headers, params=params)
         response = self.session.send(request.prepare())
 
