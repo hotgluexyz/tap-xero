@@ -301,6 +301,7 @@ all_streams = [
     # JOURNALS STREAM
     # This endpoint is paginated, but in its own special snowflake way.
     Journals("journals", ["JournalID"], bookmark_key="JournalNumber", format_fn=transform.format_journals),
+    Journals("journals_payments_only", ["JournalID"], bookmark_key="JournalNumber", format_fn=transform.format_journals),
 
     # NON-PAGINATED STREAMS
     # These endpoints do not support pagination, but do support the Modified At
