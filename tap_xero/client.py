@@ -286,7 +286,11 @@ def raise_for_error(resp):
             if error_code == 429:
                 resp_headers = resp.headers
                 api_rate_limit_message = ERROR_CODE_EXCEPTION_MAPPING[429]["message"]
-                message = "HTTP-error-code: 429, Error: {}. Please retry after {} {}".format(api_rate_limit_message, resp_headers.get("Retry-After"),resp_headers.get("X-Rate-Limit-Problem"))
+                message = "HTTP-error-code: 429, Error: {}. Please retry after {} seconds. \nRemaining API calls for this day: {}".format(
+                    api_rate_limit_message,
+                    resp_headers.get("Retry-After"),
+                    resp_headers.get("X-DayLimit-Remaining"),
+                )
 
                 #Raise XeroTooManyInMinuteError exception if minute limit is reached
                 if resp_headers.get("X-Rate-Limit-Problem") == 'minute':
