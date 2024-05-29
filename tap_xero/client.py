@@ -249,6 +249,7 @@ class XeroClient():
             is_report = True
             xero_resource_name = xero_resource_name.replace("Reports", "Reports/")
         url = join(BASE_URL, xero_resource_name)
+        LOGGER.info(f"Request to url {url} with tenant id {self.tenant_id} and access_token {self.access_token}")
         headers = {"Accept": "application/json",
                    "Authorization": "Bearer " + self.access_token,
                    "Xero-tenant-id": self.tenant_id}

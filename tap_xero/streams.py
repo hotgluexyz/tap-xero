@@ -44,13 +44,13 @@ def _make_request(ctx, tap_stream_id, filter_options=None, attempts=0):
     try:
         return _request_with_timer(tap_stream_id, ctx.client, filter_options)
     except XeroUnauthorizedError as e:
-        if attempts == 1:
+        if attempts > 2:
             raise e
         ctx.refresh_credentials()
         return _make_request(ctx, tap_stream_id, filter_options, attempts + 1)
     except HTTPError as e:
         if e.response.status_code == 401:
-            if attempts == 1:
+            if attempts > 2:
                 raise Exception("Received Not Authorized response after credential refresh.") from e
             ctx.refresh_credentials()
             return _make_request(ctx, tap_stream_id, filter_options, attempts + 1)
