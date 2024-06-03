@@ -236,8 +236,15 @@ class XeroClient():
         if response.status_code != 200:
             raise_for_error(response)
 
+    def log_backoff_attempt(details):
+        """
+        For logging attempts to connect with Amazon
+        :param details:
+        :return:
+        """
+        LOGGER.info("Error detected communicating with Xero, triggering backoff: %d try", details.get("tries"))
 
-    @backoff.on_exception(backoff.expo, (json.decoder.JSONDecodeError, XeroInternalError,RemoteDisconnected,ConnectionError,ReadTimeout,ChunkedEncodingError,ProtocolError), max_tries=3)
+    @backoff.on_exception(backoff.expo, (json.decoder.JSONDecodeError, XeroInternalError,RemoteDisconnected,ConnectionError,ReadTimeout,ChunkedEncodingError,ProtocolError), on_backoff=log_backoff_attempt, max_tries=5, factor=5)
     @backoff.on_exception(retry_after_wait_gen, XeroTooManyInMinuteError, giveup=is_not_status_code_fn([429]), jitter=None, max_tries=3)
     def filter(self, tap_stream_id, since=None, **params):
         xero_resource_name = tap_stream_id.title().replace("_", "")
