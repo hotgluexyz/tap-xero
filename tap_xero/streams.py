@@ -192,9 +192,10 @@ class Journals(Stream):
                 filter_options['headers'] = {"If-Modified-Since": start_date.strftime("%Y-%m-%dT%H:%M:%SZ")}
 
             records = _make_request(ctx, self.tap_stream_id, filter_options)
-            logging.info("Got {} records: {}".format(
-                len(records), records
-            ))
+            # NOTE: Uncomment below for debugging, I commented it out because the logs were atrocious
+            # logging.info("Got {} records: {}".format(
+            #     len(records), records
+            # ))
             if records:
                 self.format_fn(records)
                 self.write_records(records, ctx)
