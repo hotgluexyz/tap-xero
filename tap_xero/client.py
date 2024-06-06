@@ -104,6 +104,10 @@ ERROR_CODE_EXCEPTION_MAPPING = {
     503: {
         "raise_exception": XeroNotAvailableError,
         "message": "API service is currently unavailable."
+    },
+    504: {
+        "raise_exception": XeroInternalError,
+        "message": "An unhandled error with the Xero API. Contact the Xero API team if problems persist."
     }
 }
 
