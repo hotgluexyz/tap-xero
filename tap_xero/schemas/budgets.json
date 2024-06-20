@@ -1,0 +1,111 @@
+{
+  "type": [
+    "null",
+    "object"
+  ],
+  "properties": {
+    "from_date": {
+      "type": [
+        "null",
+        "string"
+      ],
+      "format": "date-time"
+    },
+    "to_date": {
+      "type": [
+        "null",
+        "string"
+      ],
+      "format": "date-time"
+    },
+    "BudgetID": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "Type": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "Description": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "UpdatedDateUTC": {
+      "type": [
+        "null",
+        "string"
+      ],
+      "format": "date-time"
+    },
+    "Tracking": {
+      "items": {
+        "properties": {
+          "Name": {
+            "type": [
+              "string"
+            ]
+          },
+          "Option": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "TrackingCategoryID": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "Options": {
+            "type": [
+              "null",
+              "array"
+            ]
+          }
+        },
+        "type": [
+          "null",
+          "object"
+        ],
+        "additionalProperties": false
+      },
+      "type": [
+        "null",
+        "array"
+      ]
+    },
+    "BudgetLines": {
+      "items": {
+        "properties": {
+          "AccountID": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "AccountCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "BudgetBalances": {
+            "type": [
+              "null",
+              "array"
+            ]
+          }
+
+        }
+      }  
+    }
+  },
+  "additionalProperties": false
+}
