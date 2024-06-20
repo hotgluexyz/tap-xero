@@ -104,6 +104,10 @@ ERROR_CODE_EXCEPTION_MAPPING = {
     503: {
         "raise_exception": XeroNotAvailableError,
         "message": "API service is currently unavailable."
+    },
+    504: {
+        "raise_exception": XeroInternalError,
+        "message": "An unhandled error with the Xero API. Contact the Xero API team if problems persist."
     }
 }
 
@@ -236,11 +240,21 @@ class XeroClient():
         if response.status_code != 200:
             raise_for_error(response)
 
+    def log_backoff_attempt(details):
+        """
+        For logging attempts to connect with Amazon
+        :param details:
+        :return:
+        """
+        LOGGER.info("Error detected communicating with Xero, triggering backoff: %d try", details.get("tries"))
 
-    @backoff.on_exception(backoff.expo, (json.decoder.JSONDecodeError, XeroInternalError,RemoteDisconnected,ConnectionError,ReadTimeout,ChunkedEncodingError,ProtocolError), max_tries=3)
+    @backoff.on_exception(backoff.expo, (json.decoder.JSONDecodeError, XeroInternalError,RemoteDisconnected,ConnectionError,ReadTimeout,ChunkedEncodingError,ProtocolError), on_backoff=log_backoff_attempt, max_tries=5, factor=5)
     @backoff.on_exception(retry_after_wait_gen, XeroTooManyInMinuteError, giveup=is_not_status_code_fn([429]), jitter=None, max_tries=3)
     def filter(self, tap_stream_id, since=None, **params):
         xero_resource_name = tap_stream_id.title().replace("_", "")
+        #override resource name for Journals with payments only stream.
+        if xero_resource_name == "JournalsPaymentsOnly":
+            xero_resource_name = "Journals"
         is_report = False
         if xero_resource_name.startswith("Reports"):
             is_report = True
@@ -255,7 +269,8 @@ class XeroClient():
             headers["User-Agent"] = self.user_agent
         if since:
             headers["If-Modified-Since"] = since
-
+        if tap_stream_id == "journals_payments_only":
+            params.update({"paymentsOnly":'true'})
         request = requests.Request("GET", url, headers=headers, params=params)
         response = self.session.send(request.prepare())
 
@@ -282,11 +297,17 @@ def raise_for_error(resp):
             if error_code == 429:
                 resp_headers = resp.headers
                 api_rate_limit_message = ERROR_CODE_EXCEPTION_MAPPING[429]["message"]
-                message = "HTTP-error-code: 429, Error: {}. Please retry after {} {}".format(api_rate_limit_message, resp_headers.get("Retry-After"),resp_headers.get("X-Rate-Limit-Problem"))
+                message = "HTTP-error-code: 429, Error: {}. Hit limit {} - please retry after {} seconds. \nRemaining API calls for this day: {}".format(
+                    api_rate_limit_message,
+                    resp_headers.get("X-Rate-Limit-Problem"),
+                    resp_headers.get("Retry-After"),
+                    resp_headers.get("X-DayLimit-Remaining"),
+                )
+                LOGGER.warning(message)
 
                 #Raise XeroTooManyInMinuteError exception if minute limit is reached
-                if resp_headers.get("X-Rate-Limit-Problem") == 'minute':
-                    raise XeroTooManyInMinuteError(message, resp) from None
+                # if resp_headers.get("X-Rate-Limit-Problem") == 'minute':
+                raise XeroTooManyInMinuteError(message, resp) from None
             # Handling status code 403 specially since response of API does not contain enough information
             elif error_code in (403, 401):
                 api_message = ERROR_CODE_EXCEPTION_MAPPING[error_code]["message"]

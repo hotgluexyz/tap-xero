@@ -194,9 +194,10 @@ class Journals(Stream):
                 filter_options['headers'] = {"If-Modified-Since": start_date.strftime("%Y-%m-%dT%H:%M:%SZ")}
 
             records = _make_request(ctx, self.tap_stream_id, filter_options)
-            logging.info("Got {} records: {}".format(
-                len(records), records
-            ))
+            # NOTE: Uncomment below for debugging, I commented it out because the logs were atrocious
+            # logging.info("Got {} records: {}".format(
+            #     len(records), records
+            # ))
             if records:
                 self.format_fn(records)
                 self.write_records(records, ctx)
@@ -303,6 +304,7 @@ all_streams = [
     # JOURNALS STREAM
     # This endpoint is paginated, but in its own special snowflake way.
     Journals("journals", ["JournalID"], bookmark_key="JournalNumber", format_fn=transform.format_journals),
+    Journals("journals_payments_only", ["JournalID"], bookmark_key="JournalNumber", format_fn=transform.format_journals),
 
     # NON-PAGINATED STREAMS
     # These endpoints do not support pagination, but do support the Modified At
