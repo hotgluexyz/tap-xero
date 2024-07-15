@@ -247,11 +247,15 @@ class XeroClient():
         :return:
         """
         LOGGER.info("Error detected communicating with Xero, triggering backoff: %d try", details.get("tries"))
-
+        
+    def capitalize_first_letter(self,s):
+        if len(s) == 0:
+            return s
+        return s[0].upper() + s[1:]
     @backoff.on_exception(backoff.expo, (json.decoder.JSONDecodeError, XeroInternalError,RemoteDisconnected,ConnectionError,ReadTimeout,ChunkedEncodingError,ProtocolError), on_backoff=log_backoff_attempt, max_tries=5, factor=5)
     @backoff.on_exception(retry_after_wait_gen, XeroTooManyInMinuteError, giveup=is_not_status_code_fn([429]), jitter=None, max_tries=3)
-    def filter(self, tap_stream_id, since=None, **params):
-        xero_resource_name = tap_stream_id.title().replace("_", "")
+    def filter(self, tap_stream_id, since=None,url=BASE_URL, **params):
+        xero_resource_name = self.capitalize_first_letter(tap_stream_id).replace("_", "")
         #override resource name for Journals with payments only stream.
         if xero_resource_name == "JournalsPaymentsOnly":
             xero_resource_name = "Journals"
@@ -259,7 +263,7 @@ class XeroClient():
         if xero_resource_name.startswith("Reports"):
             is_report = True
             xero_resource_name = xero_resource_name.replace("Reports", "Reports/")
-        url = join(BASE_URL, xero_resource_name)
+        url = join(url, xero_resource_name)
         headers = {"Accept": "application/json",
                    "Authorization": "Bearer " + self.access_token,
                    "Xero-tenant-id": self.tenant_id}
@@ -282,7 +286,18 @@ class XeroClient():
                                     object_hook=_json_load_object_hook,
                                     parse_float=decimal.Decimal)
             if not is_report:
+                if xero_resource_name == "Employees" and "employees" in response_body:
+                    #UK endpoint returns a list of employees instead of Employees
+                    xero_resource_name = "employees"
+                if xero_resource_name == "PayRuns" and "payRuns" in response_body:
+                    #UK endpoint of payruns have a different key
+                    xero_resource_name = "payRuns"
+                if xero_resource_name == "Timesheets" and "timesheets" in response_body:
+                    # UK endpoint of timesheets have a different key
+                    xero_resource_name = "timesheets"
                 response_body = response_body.pop(xero_resource_name)
+                if xero_resource_name in ["PayItems"]:
+                    response_body = [response_body]
             return response_body
 
 

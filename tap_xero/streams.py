@@ -20,10 +20,13 @@ FULL_PAGE_SIZE = 100
 logging.getLogger('backoff').setLevel(logging.CRITICAL)
 
 
-def _request_with_timer(tap_stream_id, xero, filter_options):
+def _request_with_timer(tap_stream_id, xero, filter_options,url=None,):
     with metrics.http_request_timer(tap_stream_id) as timer:
         try:
-            resp = xero.filter(tap_stream_id, **filter_options)
+            if url:
+                resp = xero.filter(tap_stream_id, url=url, **filter_options)
+            else:    
+                resp = xero.filter(tap_stream_id, **filter_options)
             timer.tags[metrics.Tag.http_status_code] = 200
             return resp
         except HTTPError as e:
@@ -39,21 +42,21 @@ class RateLimitException(Exception):
                       (RateLimitException,RemoteDisconnected,ConnectionError,ReadTimeout,ChunkedEncodingError,ProtocolError),
                       max_tries=10,
                       factor=2)
-def _make_request(ctx, tap_stream_id, filter_options=None, attempts=0):
+def _make_request(ctx, tap_stream_id, filter_options=None, attempts=0,url=None):
     filter_options = filter_options or {}
     try:
-        return _request_with_timer(tap_stream_id, ctx.client, filter_options)
+        return _request_with_timer(tap_stream_id, ctx.client, filter_options,url=url)
     except XeroUnauthorizedError as e:
         if attempts == 1:
             raise e
         ctx.refresh_credentials()
-        return _make_request(ctx, tap_stream_id, filter_options, attempts + 1)
+        return _make_request(ctx, tap_stream_id, filter_options, attempts + 1,url=url)
     except HTTPError as e:
         if e.response.status_code == 401:
             if attempts == 1:
                 raise Exception("Received Not Authorized response after credential refresh.") from e
             ctx.refresh_credentials()
-            return _make_request(ctx, tap_stream_id, filter_options, attempts + 1)
+            return _make_request(ctx, tap_stream_id, filter_options, attempts + 1,url=url)
 
         if e.response.status_code in [429, 503]:
             raise RateLimitException() from e
@@ -171,11 +174,19 @@ class PaginatedStream(Stream):
             ctx.set_offset(offset, curr_page_num)
             ctx.write_state()
             self.filter_options["page"] = curr_page_num
-            records = _make_request(ctx, self.tap_stream_id, self.filter_options)
+            if hasattr(self, "url"):
+                # Use the overridden stream name / id
+                if hasattr(self, "stream_id"):
+                    records = _make_request(ctx, self.stream_id, self.filter_options, url=self.url)
+                else:    
+                    records = _make_request(ctx, self.tap_stream_id, self.filter_options, url=self.url)
+            else:    
+                records = _make_request(ctx, self.tap_stream_id, self.filter_options)
             if records:
                 self.format_fn(records)
                 self.write_records(records, ctx)
-                max_updated = records[-1][self.bookmark_key]
+                if self.bookmark_key:
+                    max_updated = records[-1][self.bookmark_key]
             if not records or len(records) < FULL_PAGE_SIZE:
                 break
             curr_page_num += 1
@@ -299,6 +310,87 @@ class Everything(Stream):
         records = _make_request(ctx, self.tap_stream_id)
         self.format_fn(records)
         self.write_records(records, ctx)
+        
+class PayrollAUStreams:
+    url = "https://api.xero.com/payroll.xro/1.0"
+        
+class PayrollUKStreams:
+    url = "https://api.xero.com/payroll.xro/2.0"
+
+
+class PayrollEmployeesAU(PaginatedStream, PayrollAUStreams):
+    stream_id = "employees"
+    def __init__(self, *args, **kwargs):
+        super().__init__(
+            "payroll_employees_au",
+            ["EmployeeID"],
+            *args,
+            **kwargs,
+        )
+class PayrollPayItemsAU(PaginatedStream, PayrollAUStreams):
+    stream_id = "PayItems"
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(
+            "payroll_payitems_au",
+            [],
+            None,
+            *args,
+            **kwargs,
+        )
+class PayrollPayRunsAU(PaginatedStream, PayrollAUStreams):
+    stream_id = "PayRuns"
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(
+            "payroll_payruns_au",
+            ["PayRunID"],
+            *args,
+            **kwargs,
+        )
+class PayrollTimeSheetsAU(PaginatedStream, PayrollAUStreams):
+    stream_id = "Timesheets"
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(
+            "payroll_timesheets_au",
+            ["TimesheetID"],
+            *args,
+            **kwargs,
+        )
+
+class PayrollEmployeesUK(PaginatedStream, PayrollUKStreams):
+    stream_id = "employees"
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(
+            "payroll_employees_uk",
+            ["employeeID"],
+            *args,
+            **kwargs,
+        )
+
+class PayrollPayRunsUK(PaginatedStream, PayrollUKStreams):
+    stream_id = "PayRuns"
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(
+            "payroll_payruns_uk",
+            ["payRunID"],
+            None, # No bookmark key
+            *args,
+            **kwargs,
+        )
+class PayrollTimeSheetsUK(PaginatedStream, PayrollUKStreams):
+    stream_id = "timesheets"
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(
+            "payroll_timesheets_uk",
+            ["timesheetID"],
+            *args,
+            **kwargs,
+        )
 
 
 all_streams = [
@@ -309,48 +401,75 @@ all_streams = [
     PaginatedStream("bank_transactions", ["BankTransactionID"]),
     Contacts(),
     PaginatedStream("quotes", ["QuoteID"]),
-    PaginatedStream("credit_notes", ["CreditNoteID"], format_fn=transform.format_credit_notes),
+    PaginatedStream(
+        "credit_notes", ["CreditNoteID"], format_fn=transform.format_credit_notes
+    ),
     PaginatedStream("invoices", ["InvoiceID"], format_fn=transform.format_invoices),
     PaginatedStream("manual_journals", ["ManualJournalID"]),
-    PaginatedStream("overpayments", ["OverpaymentID"], format_fn=transform.format_over_pre_payments),
+    PaginatedStream(
+        "overpayments", ["OverpaymentID"], format_fn=transform.format_over_pre_payments
+    ),
     PaginatedStream("payments", ["PaymentID"], format_fn=transform.format_payments),
-    PaginatedStream("prepayments", ["PrepaymentID"], format_fn=transform.format_over_pre_payments),
+    PaginatedStream(
+        "prepayments", ["PrepaymentID"], format_fn=transform.format_over_pre_payments
+    ),
     PaginatedStream("purchase_orders", ["PurchaseOrderID"]),
-
     # JOURNALS STREAM
     # This endpoint is paginated, but in its own special snowflake way.
-    Journals("journals", ["JournalID"], bookmark_key="JournalNumber", format_fn=transform.format_journals),
-    Journals("journals_payments_only", ["JournalID"], bookmark_key="JournalNumber", format_fn=transform.format_journals),
-
+    Journals(
+        "journals",
+        ["JournalID"],
+        bookmark_key="JournalNumber",
+        format_fn=transform.format_journals,
+    ),
+    Journals(
+        "journals_payments_only",
+        ["JournalID"],
+        bookmark_key="JournalNumber",
+        format_fn=transform.format_journals,
+    ),
     # NON-PAGINATED STREAMS
     # These endpoints do not support pagination, but do support the Modified At
     # header.
     BookmarkedStream("accounts", ["AccountID"]),
-    BookmarkedStream("bank_transfers", ["BankTransferID"], bookmark_key="CreatedDateUTC"),
+    BookmarkedStream(
+        "bank_transfers", ["BankTransferID"], bookmark_key="CreatedDateUTC"
+    ),
     BookmarkedStream("employees", ["EmployeeID"]),
     BookmarkedStream("expense_claims", ["ExpenseClaimID"]),
     BookmarkedStream("items", ["ItemID"]),
     BookmarkedStream("receipts", ["ReceiptID"], format_fn=transform.format_receipts),
     BookmarkedStream("users", ["UserID"], format_fn=transform.format_users),
-
     # PULL EVERYTHING STREAMS
     # These endpoints do not support the Modified After header (or paging), so
     # we must pull all the data each time.
     Everything("branding_themes", ["BrandingThemeID"]),
-    Everything("contact_groups", ["ContactGroupID"], format_fn=transform.format_contact_groups),
+    Everything(
+        "contact_groups", ["ContactGroupID"], format_fn=transform.format_contact_groups
+    ),
     Everything("currencies", ["Code"]),
     Everything("organisations", ["OrganisationID"]),
     Everything("repeating_invoices", ["RepeatingInvoiceID"]),
     Everything("tax_rates", ["TaxType"]),
     Everything("tracking_categories", ["TrackingCategoryID"]),
-
     # LINKED TRANSACTIONS STREAM
     # This endpoint is not paginated, but can do some manual filtering
-    LinkedTransactions("linked_transactions", ["LinkedTransactionID"], bookmark_key="UpdatedDateUTC"),
-
+    LinkedTransactions(
+        "linked_transactions", ["LinkedTransactionID"], bookmark_key="UpdatedDateUTC"
+    ),
     # REPORTS STREAM
     ReportStream("reports_profit_and_loss", ["from_date"], bookmark_key="to_date"),
     ReportStream("reports_balance_sheet", ["from_date"], bookmark_key="to_date"),
-    ReportStream("budgets", ["from_date"], bookmark_key="to_date")
+    ReportStream("budgets", ["from_date"], bookmark_key="to_date"),
+    # Payroll Streams
+    # Payroll AU
+    PayrollEmployeesAU(),
+    PayrollPayItemsAU(),
+    PayrollPayRunsAU(),
+    PayrollTimeSheetsAU(),
+    # Payroll UK
+    PayrollEmployeesUK(),
+    PayrollPayRunsUK(),
+    PayrollTimeSheetsUK(),
 ]
 all_stream_ids = [s.tap_stream_id for s in all_streams]

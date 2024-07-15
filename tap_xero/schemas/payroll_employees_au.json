@@ -1,0 +1,70 @@
+{
+    "type": [
+        "null",
+        "object"
+    ],
+    "properties": {
+        "EmployeeID": {
+            "type": [
+                "string"
+            ]
+        },
+        "FirstName": {
+            "type": [
+                "null",
+                "string"
+            ]
+        },
+        "MiddleNames": {
+            "type": [
+                "null",
+                "string"
+            ]
+        },
+        "LastName": {
+            "type": [
+                "null",
+                "string"
+            ]
+        },
+        "Status": {
+            "type": [
+                "null",
+                "string"
+            ]
+        },
+        "DateOfBirth": {
+            "format": "date",
+            "type": [
+                "null",
+                "string"
+            ]
+        },
+        "Email": {
+            "type": [
+                "null",
+                "string"
+            ]
+        },
+        "Phone": {
+            "type": [
+                "null",
+                "string"
+            ]
+        },
+        "Mobile": {
+            "type": [
+                "null",
+                "string"
+            ]
+        },
+    
+        "UpdatedDateUTC": {
+            "format": "date-time",
+            "type": [
+                "null",
+                "string"
+            ]
+        }
+    }
+}
