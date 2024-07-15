@@ -1,0 +1,130 @@
+{
+    "type": [
+        "null",
+        "object"
+    ],
+    "properties": {
+        "employeeID": {
+            "type": [
+                "null",
+                "string"
+            ]
+        },
+        "firstName": {
+            "type": [
+                "null",
+                "string"
+            ]
+        },
+        "lastName": {
+            "type": [
+                "null",
+                "string"
+            ]
+        },
+        "dateOfBirth": {
+            "type": [
+                "null",
+                "string"
+            ],
+            "format": "date-time"
+        },
+        "gender": {
+            "type": [
+                "null",
+                "string"
+            ]
+        },
+        "email": {
+            "type": [
+                "null",
+                "string"
+            ]
+        },
+        "phoneNumber": {
+            "type": [
+                "null",
+                "string"
+            ]
+        },
+        "startDate": {
+            "type": [
+                "null",
+                "string"
+            ],
+            "format": "date-time"
+        },
+        "isOffPayrollWorker": {
+            "type": [
+                "null",
+                "boolean"
+            ]
+        },
+        "address": {
+            "type": [
+                "null",
+                "object"
+            ],
+            "properties": {
+                "addressLine1": {
+                    "type": [
+                        "null",
+                        "string"
+                    ]
+                },
+                "addressLine2": {
+                    "type": [
+                        "null",
+                        "string"
+                    ]
+                },
+                "city": {
+                    "type": [
+                        "null",
+                        "string"
+                    ]
+                },
+                "county": {
+                    "type": [
+                        "null",
+                        "string"
+                    ]
+                },
+                "postCode": {
+                    "type": [
+                        "null",
+                        "string"
+                    ]
+                }
+            },
+            "additionalProperties": false
+        },
+        "payrollCalendarID": {
+            "type": [
+                "null",
+                "string"
+            ]
+        },
+        "updatedDateUTC": {
+            "type": [
+                "null",
+                "string"
+            ],
+            "format": "date-time"
+        },
+        "createdDateUTC": {
+            "type": [
+                "null",
+                "string"
+            ],
+            "format": "date-time"
+        },
+        "endDate": {
+            "type": [
+                "null",
+                "string"
+            ]
+        }
+    },
+    "additionalProperties": false
+}

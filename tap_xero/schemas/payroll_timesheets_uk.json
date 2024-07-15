@@ -1,0 +1,52 @@
+{
+    "type": [
+        "null",
+        "object"
+    ],
+    "properties": {
+        "timesheetID": {
+            "type": [
+                "string"
+            ]
+        },
+        "payrollCalendarID": {
+            "type": [
+                "string"
+            ]
+        },
+        "employeeID": {
+            "type": [
+                "string"
+            ]
+        },
+        "startDate": {
+            "type": [
+                "string"
+            ],
+            "format": "date-time"
+        },
+        "endDate": {
+            "type": [
+                "string"
+            ],
+            "format": "date-time"
+        },
+        "status": {
+            "type": [
+                "string"
+            ]
+        },
+        "totalHours": {
+            "type": [
+                "number"
+            ]
+        },
+        "updatedDateUTC": {
+            "type": [
+                "string"
+            ],
+            "format": "date-time"
+        }
+    },
+    "additionalProperties": false
+}
