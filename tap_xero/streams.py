@@ -114,6 +114,8 @@ class ReportStream(Stream):
             to_date = to_date.strftime("%Y-%m-%d")
             if self.tap_stream_id == "budgets":
                 self.filter_options.update(dict(DateFrom=from_date, DateTo=to_date))
+            elif self.tap_stream_id == "reports_balance_sheet":
+                self.filter_options.update(dict(date=from_date, timeframe="MONTH"))
             else:
                 self.filter_options.update(dict(fromDate=from_date, toDate=to_date))
             records = _make_request(ctx, self.tap_stream_id, self.filter_options)
