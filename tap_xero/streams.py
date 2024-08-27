@@ -106,26 +106,46 @@ class ReportStream(Stream):
 
         start_dt = parse(start)
         start_dt = datetime(start_dt.year, start_dt.month, 1)
+        previous_budgets = set()
+        break_loop = False
         while True:
             from_date = start_dt.strftime("%Y-%m-01")
             to_date = start_dt + relativedelta(months=1) - timedelta(1)
             to_date = to_date.strftime("%Y-%m-%d")
-            self.filter_options.update(dict(fromDate=from_date, toDate=to_date))
+            if self.tap_stream_id == "budgets":
+                self.filter_options.update(dict(DateFrom=from_date, DateTo=to_date))
+            elif self.tap_stream_id == "reports_balance_sheet":
+                self.filter_options.update(dict(date=from_date, timeframe="MONTH"))
+            else:
+                self.filter_options.update(dict(fromDate=from_date, toDate=to_date))
             records = _make_request(ctx, self.tap_stream_id, self.filter_options)
-
-            records = records["Reports"]
-
             report_rows = []
-            for row in records[0]["Rows"]:
-                if row["RowType"]=="Section":
-                    for r in row["Rows"]:
-                        if r["RowType"]=="Row":
-                            record = {}
-                            record["from_date"] = from_date
-                            record["to_date"] = to_date
-                            record["account"] = r["Cells"][0]["Value"]
-                            record["value"] = r["Cells"][1]["Value"]
-                            report_rows.append(record)
+            if self.tap_stream_id == "budgets":
+                for row in records:
+                    row["from_date"] = from_date
+                    row["to_date"] = to_date
+                    if not row["BudgetID"] in previous_budgets:
+                        previous_budgets.add(row["BudgetID"])
+                    else:
+                        # Already processed, the API is returning same response for all date ranges
+                        # Need live account to test further
+                        break_loop = True
+                    report_rows.append(row)
+            else:    
+                records = records["Reports"]
+                for row in records[0]["Rows"]:
+                    if row["RowType"]=="Section":
+                        for r in row["Rows"]:
+                            if r["RowType"]=="Row":
+                                record = {}
+                                record["from_date"] = from_date
+                                record["to_date"] = to_date
+                                record["account"] = r["Cells"][0]["Value"]
+                                record["value"] = r["Cells"][1]["Value"]
+                                report_rows.append(record)
+            if break_loop:
+                #Budgets, need to break because the API is returning same response for all date ranges
+                break                    
             if report_rows:
                 self.format_fn(report_rows)
                 self.write_records(report_rows, ctx)
@@ -192,9 +212,10 @@ class Journals(Stream):
                 filter_options['headers'] = {"If-Modified-Since": start_date.strftime("%Y-%m-%dT%H:%M:%SZ")}
 
             records = _make_request(ctx, self.tap_stream_id, filter_options)
-            logging.info("Got {} records: {}".format(
-                len(records), records
-            ))
+            # NOTE: Uncomment below for debugging, I commented it out because the logs were atrocious
+            # logging.info("Got {} records: {}".format(
+            #     len(records), records
+            # ))
             if records:
                 self.format_fn(records)
                 self.write_records(records, ctx)
@@ -331,6 +352,7 @@ all_streams = [
 
     # REPORTS STREAM
     ReportStream("reports_profit_and_loss", ["from_date"], bookmark_key="to_date"),
-    ReportStream("reports_balance_sheet", ["from_date"], bookmark_key="to_date")
+    ReportStream("reports_balance_sheet", ["from_date"], bookmark_key="to_date"),
+    ReportStream("budgets", ["from_date"], bookmark_key="to_date")
 ]
 all_stream_ids = [s.tap_stream_id for s in all_streams]
