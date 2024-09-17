@@ -30,17 +30,50 @@
       "exclusiveMinimum": true,
       "exclusiveMaximum": true
     },
+    "ItemCode": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
     "AccountCode": {
       "type": [
         "null",
         "string"
       ]
     },
-    "ItemCode": {
+    "AccountID":{
       "type": [
         "null",
         "string"
       ]
+    },
+    "Item":{
+      "type": [
+        "null",
+        "object"
+      ],
+      "properties": {
+        "ItemID": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "Name": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "Code": {
+          "type": [
+            "null",
+            "string"
+          ]
+        }
+      },
+      "additionalProperties": false
     },
     "LineItemID": {
       "type": [
@@ -53,16 +86,6 @@
         "string"
       ]
     },
-    "LineAmount": {
-      "type": [
-        "null",
-        "number"
-      ],
-      "minimum": -1e+33,
-      "maximum": 1e+33,
-      "exclusiveMinimum": true,
-      "exclusiveMaximum": true
-    },
     "TaxAmount": {
       "type": [
         "null",
@@ -73,7 +96,27 @@
       "exclusiveMinimum": true,
       "exclusiveMaximum": true
     },
+    "LineAmount": {
+      "type": [
+        "null",
+        "number"
+      ],
+      "minimum": -1e+33,
+      "maximum": 1e+33,
+      "exclusiveMinimum": true,
+      "exclusiveMaximum": true
+    },
     "DiscountRate": {
+      "type": [
+        "null",
+        "number"
+      ],
+      "minimum": -1e+33,
+      "maximum": 1e+33,
+      "exclusiveMinimum": true,
+      "exclusiveMaximum": true
+    },
+    "DiscountAmount": {
       "type": [
         "null",
         "number"
