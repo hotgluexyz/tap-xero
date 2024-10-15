@@ -1,0 +1,102 @@
+{
+    "type": [
+        "null",
+        "object"
+    ],
+    "properties": {
+        "TimesheetID": {
+            "type": [
+                "null",
+                "string"
+            ]
+        },
+        "EmployeeID": {
+            "type": [
+                "null",
+                "string"
+            ]
+        },
+        "StartDate": {
+            "type": [
+                "null",
+                "string"
+            ],
+            "format": "date-time"
+        },
+        "EndDate": {
+            "type": [
+                "null",
+                "string"
+            ],
+            "format": "date-time"
+        },
+        "Status": {
+            "type": [
+                "null",
+                "string"
+            ]
+        },
+        "Hours": {
+            "type": [
+                "null",
+                "number"
+            ],
+            "minimum": -1e+33,
+            "maximum": 1e+33,
+            "exclusiveMinimum": true,
+            "exclusiveMaximum": true
+        },
+        "TimesheetLines": {
+            "type": [
+                "null",
+                "array"
+            ],
+            "items": {
+                "type": [
+                    "null",
+                    "object"
+                ],
+                "properties": {
+                    "EarningsRateID": {
+                        "type": [
+                            "null",
+                            "string"
+                        ]
+                    },
+                    "NumberOfUnits": {
+                        "type": [
+                            "null",
+                            "array"
+                        ],
+                        "items": {
+                            "type": [
+                                "null",
+                                "number"
+                            ],
+                            "minimum": -1e+33,
+                            "maximum": 1e+33,
+                            "exclusiveMinimum": true,
+                            "exclusiveMaximum": true
+                        }
+                    },
+                    "UpdatedDateUTC": {
+                        "type": [
+                            "null",
+                            "string"
+                        ],
+                        "format": "date-time"
+                    }
+                },
+                "additionalProperties": false
+            }
+        },
+        "UpdatedDateUTC": {
+            "type": [
+                "null",
+                "string"
+            ],
+            "format": "date-time"
+        }
+    },
+    "additionalProperties": false
+}
