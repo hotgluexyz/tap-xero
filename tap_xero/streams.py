@@ -63,12 +63,12 @@ def _make_request(ctx, tap_stream_id, filter_options=None, attempts=0):
 
 
 class Stream():
-    def __init__(self, tap_stream_id, pk_fields, bookmark_key="UpdatedDateUTC", format_fn=None):
+    def __init__(self, tap_stream_id, pk_fields, bookmark_key="UpdatedDateUTC", format_fn=None, replication_method="INCREMENTAL"):
         self.tap_stream_id = tap_stream_id
         self.pk_fields = pk_fields
         self.format_fn = format_fn or (lambda x: x)
         self.bookmark_key = bookmark_key
-        self.replication_method = "INCREMENTAL"
+        self.replication_method = replication_method
         self.filter_options = {}
 
     def metrics(self, records):
@@ -351,8 +351,8 @@ all_streams = [
     LinkedTransactions("linked_transactions", ["LinkedTransactionID"], bookmark_key="UpdatedDateUTC"),
 
     # REPORTS STREAM
-    ReportStream("reports_profit_and_loss", ["from_date"], bookmark_key="to_date"),
-    ReportStream("reports_balance_sheet", ["from_date"], bookmark_key="to_date"),
+    ReportStream("reports_profit_and_loss", ["from_date"], bookmark_key=None, replication_method="FULL_TABLE"),
+    ReportStream("reports_balance_sheet", ["from_date"], bookmark_key=None, replication_method="FULL_TABLE"),
     ReportStream("budgets", ["from_date"], bookmark_key="to_date")
 ]
 all_stream_ids = [s.tap_stream_id for s in all_streams]
