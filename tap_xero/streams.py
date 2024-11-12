@@ -41,7 +41,7 @@ class RateLimitException(Exception):
                       factor=2)
 def _make_request(ctx, tap_stream_id, filter_options=None, attempts=0):
     filter_options = filter_options or {}
-    if tap_stream_id in ["tracking_categories",]:
+    if tap_stream_id in ["tracking_categories", "contacts"]:
         filter_options.update({'includeArchived': "true"})
     try:
         return _request_with_timer(tap_stream_id, ctx.client, filter_options)
