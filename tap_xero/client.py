@@ -268,7 +268,16 @@ class XeroClient():
         if self.user_agent:
             headers["User-Agent"] = self.user_agent
         if since:
-            headers["If-Modified-Since"] = since
+            if xero_resource_name == "Invoices":
+                # Parse the since datetime and format it for Xero's DateTime filter
+                dt = datetime.strptime(since, "%Y-%m-%dT%H:%M:%SZ")
+                # Format as DateTime(YYYY, MM, DD, HH, mm, ss) for Xero's query syntax
+                formatted_date = f"DateTime({dt.year}, {dt.month:02}, {dt.day:02}, {dt.hour:02}, {dt.minute:02}, {dt.second:02})"
+                # Add where clause to filter by Date field
+                params["where"] = f"Date >= {formatted_date}"
+            else:
+                # For all other endpoints, use If-Modified-Since header
+                headers["If-Modified-Since"] = since
         if tap_stream_id == "journals_payments_only":
             params.update({"paymentsOnly":'true'})
         request = requests.Request("GET", url, headers=headers, params=params)
