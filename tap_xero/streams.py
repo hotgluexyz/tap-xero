@@ -116,6 +116,23 @@ class ReportStream(Stream):
                 self.filter_options.update(dict(DateFrom=from_date, DateTo=to_date))
             elif self.tap_stream_id == "reports_balance_sheet":
                 self.filter_options.update(dict(date=from_date, timeframe="MONTH"))
+            elif self.tap_stream_id == "reports_profit_and_loss" and ctx.config.get("fetch_pnl_by_tracking_category", False):
+                tracking_categories = _make_request(ctx, "tracking_categories")
+                tracking_category_id = None
+                tracking_category_id_2 = None
+                for tracking_category in tracking_categories:
+                    if tracking_category["Status"] == "ACTIVE":
+                        if tracking_category_id is None:
+                            tracking_category_id = tracking_category["TrackingCategoryID"]
+                        else:
+                            tracking_category_id_2 = tracking_category["TrackingCategoryID"]
+                            break
+                if tracking_category_id is not None and tracking_category_id_2 is None:
+                    self.filter_options.update(dict(trackingCategoryID=tracking_category_id))
+                elif tracking_category_id is not None and tracking_category_id_2 is not None:
+                    self.filter_options.update(dict(trackingCategoryID=tracking_category_id, trackingCategoryID2=tracking_category_id_2))
+                else:
+                    LOGGER.info(f"Tracking Category 1 or Tracking Category 2 not found for {self.tap_stream_id}")
             else:
                 self.filter_options.update(dict(fromDate=from_date, toDate=to_date))
             records = _make_request(ctx, self.tap_stream_id, self.filter_options)
@@ -142,6 +159,9 @@ class ReportStream(Stream):
                                 record["to_date"] = to_date
                                 record["account"] = r["Cells"][0]["Value"]
                                 record["value"] = r["Cells"][1]["Value"]
+                                if ctx.config.get("fetch_pnl_by_tracking_category", False) and self.tap_stream_id == "reports_profit_and_loss":
+                                    record["tracking_category_id"] = tracking_category_id
+                                    record["tracking_category_id_2"] = tracking_category_id_2
                                 report_rows.append(record)
             if break_loop:
                 #Budgets, need to break because the API is returning same response for all date ranges

@@ -29,6 +29,18 @@
         "null",
         "string"
       ]
+    },
+    "tracking_category_id": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "tracking_category_id_2": {
+      "type": [
+        "null",
+        "string"
+      ]
     }
   },
   "additionalProperties": false
