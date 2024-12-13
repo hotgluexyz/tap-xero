@@ -1,3 +1,4 @@
+from copy import deepcopy
 from requests.exceptions import HTTPError
 import singer
 import logging
@@ -158,11 +159,18 @@ class ReportStream(Stream):
                                 record["from_date"] = from_date
                                 record["to_date"] = to_date
                                 record["account"] = r["Cells"][0]["Value"]
-                                record["value"] = r["Cells"][1]["Value"]
                                 if ctx.config.get("fetch_pnl_by_tracking_category", False) and self.tap_stream_id == "reports_profit_and_loss":
-                                    record["tracking_category_id"] = tracking_category_id
-                                    record["tracking_category_id_2"] = tracking_category_id_2
-                                report_rows.append(record)
+                                    headers = [cell["Value"] for cell in records[0]["Rows"][0]["Cells"]]
+                                    for index, (header, cell) in enumerate(zip(headers, r["Cells"])):
+                                        if index == 0:
+                                            continue
+                                        tracking_record = deepcopy(record)
+                                        tracking_record["tracking_category"] = header
+                                        tracking_record["value"] = cell["Value"]
+                                        report_rows.append(tracking_record)
+                                else:
+                                    record["value"] = r["Cells"][1]["Value"]
+                                    report_rows.append(record)
             if break_loop:
                 #Budgets, need to break because the API is returning same response for all date ranges
                 break                    
