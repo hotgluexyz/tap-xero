@@ -36,7 +36,7 @@ class TestSupportArchivedContacts(unittest.TestCase):
     @mock.patch("tap_xero.streams._make_request")
     def test_archived_contacts_selected_string(self, mocked_make_request_method):
         mocked_make_request_method.return_value = []
-        tap_stream_id = "contacts"
+        tap_stream_name = "contacts"
         contacts_stream_execution = stream_.Contacts()
 
         # ArchivedContacts parameter set to true in the MockConfig class
@@ -46,13 +46,13 @@ class TestSupportArchivedContacts(unittest.TestCase):
         expected_filter_options = dict(since="2021-04-01", order="UpdatedDateUTC ASC", includeArchived="true", page=1)
 
         # Verifying the parameters send to the _make_request method which is responsible for collecting data from the Xero platform
-        mocked_make_request_method.assert_called_with(ctx, tap_stream_id, expected_filter_options)
+        mocked_make_request_method.assert_called_with(ctx, tap_stream_name, expected_filter_options)
 
 
     @mock.patch("tap_xero.streams._make_request")
     def test_archived_contacts_selected_boolean(self, mocked_make_request_method):
         mocked_make_request_method.return_value = []
-        tap_stream_id = "contacts"
+        tap_stream_name = "contacts"
         contacts_stream_execution = stream_.Contacts()
 
         # ArchivedContacts parameter set to true in the MockConfig class
@@ -65,13 +65,13 @@ class TestSupportArchivedContacts(unittest.TestCase):
         expected_filter_options = dict(since="2021-04-01", order="UpdatedDateUTC ASC", includeArchived="true", page=1)
 
         # Verifying the parameters send to the _make_request method which is responsible for collecting data from the Xero platform
-        mocked_make_request_method.assert_called_with(ctx, tap_stream_id, expected_filter_options)
+        mocked_make_request_method.assert_called_with(ctx, tap_stream_name, expected_filter_options)
 
 
     @mock.patch("tap_xero.streams._make_request")
     def test_archived_contacts_not_selected(self, mocked_make_request_method):
         mocked_make_request_method.return_value = []
-        tap_stream_id = "contacts"
+        tap_stream_name = "contacts"
         contacts_stream_execution = stream_.Contacts()
 
         # ArchivedContacts parameter set to true in the MockConfig class
@@ -83,14 +83,14 @@ class TestSupportArchivedContacts(unittest.TestCase):
         expected_filter_options = dict(since="2021-04-01", order="UpdatedDateUTC ASC", page=1)
 
         # Verifying the parameters send to the _make_request method which is responsible for collecting data from the Xero platform
-        mocked_make_request_method.assert_called_with(ctx, tap_stream_id, expected_filter_options)
+        mocked_make_request_method.assert_called_with(ctx, tap_stream_name, expected_filter_options)
 
     @mock.patch("tap_xero.streams._make_request")
     def test_archived_contacts_parameter_with_other_streams(self, mocked_make_request_method):
         mocked_make_request_method.return_value = []
-        tap_stream_id = "accounts"
+        tap_stream_name = "accounts"
         pk_fields = ["AccountID"]
-        contacts_stream_execution = stream_.PaginatedStream(tap_stream_id, pk_fields)
+        contacts_stream_execution = stream_.PaginatedStream(tap_stream_name, pk_fields)
 
         # ArchivedContacts parameter set to true in the MockConfig class. However, for other streams, this parameter should not be passed
         # while contacting Xero platform
@@ -100,12 +100,12 @@ class TestSupportArchivedContacts(unittest.TestCase):
         expected_filter_options = dict(since="2021-04-01", order="UpdatedDateUTC ASC", page=1)
 
         # Verifying the parameters send to the _make_request method which is responsible for collecting data from the Xero platform
-        mocked_make_request_method.assert_called_with(ctx, tap_stream_id, expected_filter_options)
+        mocked_make_request_method.assert_called_with(ctx, tap_stream_name, expected_filter_options)
 
     @mock.patch("tap_xero.streams._make_request")
     def test_archived_contacts_option_not_passed_in_config(self, mocked_make_request_method):
         mocked_make_request_method.return_value = []
-        tap_stream_id = "contacts"
+        tap_stream_name = "contacts"
         contacts_stream_execution = stream_.Contacts()
 
         # ArchivedContacts parameter set to true in the MockConfig class
@@ -118,4 +118,4 @@ class TestSupportArchivedContacts(unittest.TestCase):
         expected_filter_options = dict(since="2021-04-01", order="UpdatedDateUTC ASC", page=1)
 
         # Verifying the parameters send to the _make_request method which is responsible for collecting data from the Xero platform
-        mocked_make_request_method.assert_called_with(ctx, tap_stream_id, expected_filter_options)
+        mocked_make_request_method.assert_called_with(ctx, tap_stream_name, expected_filter_options)
