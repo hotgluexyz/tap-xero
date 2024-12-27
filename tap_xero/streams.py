@@ -1,3 +1,4 @@
+from copy import deepcopy
 from requests.exceptions import HTTPError
 import singer
 import logging
@@ -39,21 +40,21 @@ class RateLimitException(Exception):
                       (RateLimitException,RemoteDisconnected,ConnectionError,ReadTimeout,ChunkedEncodingError,ProtocolError),
                       max_tries=10,
                       factor=2)
-def _make_request(ctx, tap_stream_id, filter_options=None, attempts=0):
+def _make_request(ctx, tap_stream_name, filter_options=None, attempts=0):
     filter_options = filter_options or {}
     try:
-        return _request_with_timer(tap_stream_id, ctx.client, filter_options)
+        return _request_with_timer(tap_stream_name, ctx.client, filter_options)
     except XeroUnauthorizedError as e:
         if attempts == 1:
             raise e
         ctx.refresh_credentials()
-        return _make_request(ctx, tap_stream_id, filter_options, attempts + 1)
+        return _make_request(ctx, tap_stream_name, filter_options, attempts + 1)
     except HTTPError as e:
         if e.response.status_code == 401:
             if attempts == 1:
                 raise Exception("Received Not Authorized response after credential refresh.") from e
             ctx.refresh_credentials()
-            return _make_request(ctx, tap_stream_id, filter_options, attempts + 1)
+            return _make_request(ctx, tap_stream_name, filter_options, attempts + 1)
 
         if e.response.status_code in [429, 503]:
             raise RateLimitException() from e
@@ -63,13 +64,14 @@ def _make_request(ctx, tap_stream_id, filter_options=None, attempts=0):
 
 
 class Stream():
-    def __init__(self, tap_stream_id, pk_fields, bookmark_key="UpdatedDateUTC", format_fn=None):
+    def __init__(self, tap_stream_id, pk_fields, bookmark_key="UpdatedDateUTC", format_fn=None, tap_stream_name=None):
         self.tap_stream_id = tap_stream_id
         self.pk_fields = pk_fields
         self.format_fn = format_fn or (lambda x: x)
         self.bookmark_key = bookmark_key
         self.replication_method = "INCREMENTAL"
         self.filter_options = {}
+        self.tap_stream_name = tap_stream_name if tap_stream_name else tap_stream_id
 
     def metrics(self, records):
         with metrics.record_counter(self.tap_stream_id) as counter:
@@ -90,7 +92,7 @@ class BookmarkedStream(Stream):
     def sync(self, ctx):
         bookmark = [self.tap_stream_id, self.bookmark_key]
         start = ctx.update_start_date_bookmark(bookmark)
-        records = _make_request(ctx, self.tap_stream_id, dict(since=start))
+        records = _make_request(ctx, self.tap_stream_name, dict(since=start))
         if records:
             self.format_fn(records)
             self.write_records(records, ctx)
@@ -116,9 +118,26 @@ class ReportStream(Stream):
                 self.filter_options.update(dict(DateFrom=from_date, DateTo=to_date))
             elif self.tap_stream_id == "reports_balance_sheet":
                 self.filter_options.update(dict(date=from_date, timeframe="MONTH"))
+            elif self.tap_stream_id == "reports_profit_and_loss_by_category":
+                tracking_categories = _make_request(ctx, "tracking_categories")
+                tracking_category_id = None
+                tracking_category_id_2 = None
+                for tracking_category in tracking_categories:
+                    if tracking_category["Status"] == "ACTIVE":
+                        if tracking_category_id is None:
+                            tracking_category_id = tracking_category["TrackingCategoryID"]
+                        else:
+                            tracking_category_id_2 = tracking_category["TrackingCategoryID"]
+                            break
+                if tracking_category_id is not None and tracking_category_id_2 is None:
+                    self.filter_options.update(dict(trackingCategoryID=tracking_category_id))
+                elif tracking_category_id is not None and tracking_category_id_2 is not None:
+                    self.filter_options.update(dict(trackingCategoryID=tracking_category_id, trackingCategoryID2=tracking_category_id_2))
+                else:
+                    LOGGER.info(f"Tracking Category 1 or Tracking Category 2 not found for {self.tap_stream_id}")
             else:
                 self.filter_options.update(dict(fromDate=from_date, toDate=to_date))
-            records = _make_request(ctx, self.tap_stream_id, self.filter_options)
+            records = _make_request(ctx, self.tap_stream_name, self.filter_options)
             report_rows = []
             if self.tap_stream_id == "budgets":
                 for row in records:
@@ -141,8 +160,18 @@ class ReportStream(Stream):
                                 record["from_date"] = from_date
                                 record["to_date"] = to_date
                                 record["account"] = r["Cells"][0]["Value"]
-                                record["value"] = r["Cells"][1]["Value"]
-                                report_rows.append(record)
+                                if self.tap_stream_id == "reports_profit_and_loss_by_category":
+                                    headers = [cell["Value"] for cell in records[0]["Rows"][0]["Cells"]]
+                                    for index, (header, cell) in enumerate(zip(headers, r["Cells"])):
+                                        if index == 0:
+                                            continue
+                                        tracking_record = deepcopy(record)
+                                        tracking_record["tracking_category"] = header
+                                        tracking_record["value"] = cell["Value"]
+                                        report_rows.append(tracking_record)
+                                else:
+                                    record["value"] = r["Cells"][1]["Value"]
+                                    report_rows.append(record)
             if break_loop:
                 #Budgets, need to break because the API is returning same response for all date ranges
                 break                    
@@ -173,7 +202,7 @@ class PaginatedStream(Stream):
             ctx.set_offset(offset, curr_page_num)
             ctx.write_state()
             self.filter_options["page"] = curr_page_num
-            records = _make_request(ctx, self.tap_stream_id, self.filter_options)
+            records = _make_request(ctx, self.tap_stream_name, self.filter_options)
             if records:
                 self.format_fn(records)
                 self.write_records(records, ctx)
@@ -211,7 +240,7 @@ class Journals(Stream):
                 start_date = parse(ctx.config.get("start_date"))
                 filter_options['headers'] = {"If-Modified-Since": start_date.strftime("%Y-%m-%dT%H:%M:%SZ")}
 
-            records = _make_request(ctx, self.tap_stream_id, filter_options)
+            records = _make_request(ctx, self.tap_stream_name, filter_options)
             # NOTE: Uncomment below for debugging, I commented it out because the logs were atrocious
             # logging.info("Got {} records: {}".format(
             #     len(records), records
@@ -277,7 +306,7 @@ class LinkedTransactions(Stream):
             ctx.set_offset(offset, curr_page_num)
             ctx.write_state()
             filter_options = {"page": curr_page_num}
-            raw_records = _make_request(ctx, self.tap_stream_id, filter_options)
+            raw_records = _make_request(ctx, self.tap_stream_name, filter_options)
             records = [x for x in raw_records
                        if strptime_with_tz(x[self.bookmark_key]) >= strptime_with_tz(start)]
             if records:
@@ -298,7 +327,7 @@ class Everything(Stream):
         self.replication_method = "FULL_TABLE"
 
     def sync(self, ctx):
-        records = _make_request(ctx, self.tap_stream_id)
+        records = _make_request(ctx, self.tap_stream_name)
         self.format_fn(records)
         self.write_records(records, ctx)
 
@@ -352,6 +381,7 @@ all_streams = [
 
     # REPORTS STREAM
     ReportStream("reports_profit_and_loss", ["from_date"], bookmark_key="to_date"),
+    ReportStream("reports_profit_and_loss_by_category", ["from_date"], bookmark_key="to_date", tap_stream_name="reports_profit_and_loss"),
     ReportStream("reports_balance_sheet", ["from_date"], bookmark_key="to_date"),
     ReportStream("budgets", ["from_date"], bookmark_key="to_date"),
     ReportStream("reports_bank_summary", ["from_date"], bookmark_key="to_date"),
