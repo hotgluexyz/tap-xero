@@ -135,6 +135,7 @@ class ReportStream(Stream):
                     self.filter_options.update(dict(trackingCategoryID=tracking_category_id, trackingCategoryID2=tracking_category_id_2))
                 else:
                     LOGGER.info(f"Tracking Category 1 or Tracking Category 2 not found for {self.tap_stream_id}")
+                self.filter_options.update(dict(fromDate=from_date, toDate=to_date))
             else:
                 self.filter_options.update(dict(fromDate=from_date, toDate=to_date))
             records = _make_request(ctx, self.tap_stream_name, self.filter_options)
