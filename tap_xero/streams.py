@@ -385,6 +385,6 @@ all_streams = [
     ReportStream("reports_profit_and_loss_by_category", ["from_date"], bookmark_key="to_date", tap_stream_name="reports_profit_and_loss"),
     ReportStream("reports_balance_sheet", ["from_date"], bookmark_key="to_date"),
     ReportStream("budgets", ["from_date"], bookmark_key="to_date"),
-    ReportStream("reports_bank_summary", ["from_date"], bookmark_key="to_date"),
+    ReportStream("reports_bank_summary", ["from_date"]),
 ]
 all_stream_ids = [s.tap_stream_id for s in all_streams]
