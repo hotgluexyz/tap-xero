@@ -38,6 +38,11 @@ class RateLimiter:
             
             if len(self.calls) >= self.max_calls:
                 sleep_time = self.period - (now - self.calls[0])
+
+                # Only log if there is a substantial wait time.
+                if sleep_time > 20:
+                    LOGGER.info("RateLimiter/API rate limit exceeded -- sleeping for %s seconds", str(sleep_time))
+
                 time.sleep(sleep_time) # Gonna wait for {sleep_time} secs before making next API call.
                 # Update time after sleeping
                 now = time.time()
