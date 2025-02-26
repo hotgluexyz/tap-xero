@@ -12,14 +12,46 @@ import six
 import pytz
 import backoff
 import singer
+import time
 from http.client import RemoteDisconnected
 from requests.exceptions import ConnectionError,ReadTimeout,ChunkedEncodingError
 from urllib3.exceptions import ProtocolError
+from threading import Lock
 
 LOGGER = singer.get_logger()
 
 BASE_URL = "https://api.xero.com/api.xro/2.0"
 
+class RateLimiter:
+    def __init__(self, max_calls, period):
+        self.max_calls = max_calls  # e.g., 60 calls
+        self.period = period        # in seconds, e.g., 60 seconds
+        self.calls = []
+        self.lock = Lock()
+
+    def acquire(self):
+        with self.lock:
+            now = time.time()
+
+            # Remove timestamps older than the period
+            self.calls = [call for call in self.calls if now - call < self.period]
+            
+            if len(self.calls) >= self.max_calls:
+                sleep_time = self.period - (now - self.calls[0])
+
+                # Only log if there is a substantial wait time.
+                if sleep_time > 20:
+                    LOGGER.info("RateLimiter/API rate limit exceeded -- sleeping for %s seconds", str(sleep_time))
+
+                time.sleep(sleep_time) # Gonna wait for {sleep_time} secs before making next API call.
+                # Update time after sleeping
+                now = time.time()
+                self.calls = [call for call in self.calls if now - call < self.period]
+            
+            self.calls.append(time.time())
+
+
+rate_limiter = RateLimiter(max_calls=60, period=60)  # Xero allows 60 API calls per minute
 
 class XeroError(Exception):
     def __init__(self, message=None, response=None):
@@ -251,6 +283,8 @@ class XeroClient():
     @backoff.on_exception(backoff.expo, (json.decoder.JSONDecodeError, XeroInternalError,RemoteDisconnected,ConnectionError,ReadTimeout,ChunkedEncodingError,ProtocolError), on_backoff=log_backoff_attempt, max_tries=5, factor=5)
     @backoff.on_exception(retry_after_wait_gen, XeroTooManyInMinuteError, giveup=is_not_status_code_fn([429]), jitter=None, max_tries=3)
     def filter(self, tap_stream_id, since=None, **params):
+        rate_limiter.acquire()
+
         xero_resource_name = tap_stream_id.title().replace("_", "")
         #override resource name for Journals with payments only stream.
         if xero_resource_name == "JournalsPaymentsOnly":
@@ -260,7 +294,7 @@ class XeroClient():
             is_report = True
             xero_resource_name = xero_resource_name.replace("Reports", "Reports/")
         url = join(BASE_URL, xero_resource_name)
-        LOGGER.info(f"Request to url {url} with tenant id {self.tenant_id} and access_token {self.access_token}")
+        LOGGER.info(f"Request to url {url} with tenant id {self.tenant_id}")
         headers = {"Accept": "application/json",
                    "Authorization": "Bearer " + self.access_token,
                    "Xero-tenant-id": self.tenant_id}
