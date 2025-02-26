@@ -102,3 +102,4 @@ rsa-key
 tags
 .vscode/
 .venv/
+.history
