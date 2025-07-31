@@ -19,6 +19,7 @@ from urllib3.exceptions import ProtocolError
 LOGGER = singer.get_logger()
 
 BASE_URL = "https://api.xero.com/api.xro/2.0"
+CONNECTIONS_URL = "https://api.xero.com/connections"
 
 
 class XeroError(Exception):
@@ -286,6 +287,34 @@ class XeroClient():
             return response_body
 
 
+    def _get_accessible_tenants_info(self):
+        """Retrieve accessible tenant information for 403 error messages."""
+        headers = {
+            "Accept": "application/json",
+            "Authorization": "Bearer " + self.access_token,
+        }
+        
+        try:
+            tenants_response = requests.get(CONNECTIONS_URL, headers=headers)
+            if tenants_response.status_code == 200:
+                tenants_data = tenants_response.json()
+                tenant_ids = {tenant["tenantId"] for tenant in tenants_data}
+                requested_tenant = self.tenant_id or "<unknown>"
+                accessible_tenants = ', '.join(tenant_ids) if tenant_ids else 'None'
+                
+                return (
+                    f"User doesn't have permission to access the resource. "
+                    f"Requested tenant: {requested_tenant}. "
+                    f"Accessible tenants: {accessible_tenants}."
+                )
+            else:
+                return (
+                    f"User doesn't have permission to access the resource. "
+                    f"(Failed to retrieve accessible tenants: {tenants_response.status_code})"
+                )
+        except Exception:
+            return "User doesn't have permission to access the resource."
+
     def raise_for_error(self,resp):
         try:
             resp.raise_for_status()
@@ -310,29 +339,7 @@ class XeroClient():
                     raise XeroTooManyInMinuteError(message, resp) from None
                 # Handling status code 403 specially since response of API does not contain enough information
                 elif error_code == 403:
-                    headers = {
-                        "Accept": "application/json",
-                        "Authorization": "Bearer " + self.access_token,
-                        }
-                    CONNECTIONS_URL = "https://api.xero.com/connections"
-                    tenants_response = requests.get(CONNECTIONS_URL, headers=headers)
-                    if tenants_response.status_code == 200:
-                        tenants_data = tenants_response.json()
-                        tenant_ids = set()
-                        for tenant in tenants_data:
-                            tenant_ids.add(tenant["tenantId"])
-                        requested_tenant = self.tenant_id or "<unknown>"
-                        api_message = (
-                            f"User doesn't have permission to access the resource. "
-                            f"Requested tenant: {requested_tenant}. "
-                            f"Accessible tenants: {', '.join(tenant_ids) if tenant_ids else 'None'}."
-                        )
-                    else:
-                            api_message = (
-                            f"User doesn't have permission to access the resource. "
-                            f"(Failed to retrieve accessible tenants: {tenants_response.status_code})"
-                        )
-                        
+                    api_message = self._get_accessible_tenants_info()
                     message = f"HTTP-error-code: {error_code}, Error: {api_message}"
                 elif error_code == 401:
                     api_message = ERROR_CODE_EXCEPTION_MAPPING[error_code]["message"]
