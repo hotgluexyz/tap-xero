@@ -21,6 +21,7 @@ from threading import Lock
 LOGGER = singer.get_logger()
 
 BASE_URL = "https://api.xero.com/api.xro/2.0"
+CONNECTIONS_URL = "https://api.xero.com/connections"
 
 class RateLimiter:
     def __init__(self, max_calls, period):
@@ -239,7 +240,7 @@ class XeroClient():
         resp = self.session.post("https://identity.xero.com/connect/token", headers=headers, data=post_body)
 
         if resp.status_code != 200:
-            raise_for_error(resp)
+            self.raise_for_error(resp)
         else:
             resp = resp.json()
             LOGGER.info(f"Completed refresh of OAuth tokens. response={resp}")
@@ -270,7 +271,7 @@ class XeroClient():
         response = self.session.send(request.prepare())
 
         if response.status_code != 200:
-            raise_for_error(response)
+            self.raise_for_error(response)
 
     def log_backoff_attempt(details):
         """
@@ -310,7 +311,7 @@ class XeroClient():
         response = self.session.send(request.prepare())
 
         if response.status_code != 200:
-            raise_for_error(response)
+            self.raise_for_error(response)
             return None
         else:
             response_body = json.loads(response.text,
@@ -320,54 +321,84 @@ class XeroClient():
                 response_body = response_body.pop(xero_resource_name)
             return response_body
 
-
-def raise_for_error(resp):
-    try:
-        resp.raise_for_status()
-    except (requests.HTTPError, requests.ConnectionError) as error:
+    def _get_accessible_tenants_info(self):
+        """Retrieve accessible tenant information for 403 error messages."""
+        headers = {
+            "Accept": "application/json",
+            "Authorization": "Bearer " + self.access_token,
+        }
+        
         try:
-            error_code = resp.status_code
-
-            # Handling status code 429 specially since the required information is present in the headers
-            if error_code == 429:
-                resp_headers = resp.headers
-                api_rate_limit_message = ERROR_CODE_EXCEPTION_MAPPING[429]["message"]
-                message = "HTTP-error-code: 429, Error: {}. Hit limit {} - please retry after {} seconds. \nRemaining API calls for this day: {}".format(
-                    api_rate_limit_message,
-                    resp_headers.get("X-Rate-Limit-Problem"),
-                    resp_headers.get("Retry-After"),
-                    resp_headers.get("X-DayLimit-Remaining"),
+            tenants_response = requests.get(CONNECTIONS_URL, headers=headers)
+            if tenants_response.status_code == 200:
+                tenants_data = tenants_response.json()
+                tenant_ids = {tenant["tenantId"] for tenant in tenants_data}
+                requested_tenant = self.tenant_id or "<unknown>"
+                accessible_tenants = ', '.join(tenant_ids) if tenant_ids else 'None'
+                
+                return (
+                    f"User doesn't have permission to access the resource. "
+                    f"Requested tenant: {requested_tenant}. "
+                    f"Accessible tenants: {accessible_tenants}."
                 )
-                LOGGER.warning(message)
-
-                #Raise XeroTooManyInMinuteError exception if minute limit is reached
-                # if resp_headers.get("X-Rate-Limit-Problem") == 'minute':
-                raise XeroTooManyInMinuteError(message, resp) from None
-            # Handling status code 403 specially since response of API does not contain enough information
-            elif error_code in (403, 401):
-                api_message = ERROR_CODE_EXCEPTION_MAPPING[error_code]["message"]
-                message = "HTTP-error-code: {}, Error: {}".format(error_code, api_message)
-            elif error_code == 504:
-                message = "HTTP-error-code: 504, Error: Gateway Timeout"
-                raise ReadTimeout(message)
             else:
-                # Forming a response message for raising custom exception
-                try:
-                    response_json = resp.json()
-                except Exception:
-                    response_json = {}
+                return (
+                    f"User doesn't have permission to access the resource. "
+                    f"(Failed to retrieve accessible tenants: {tenants_response.status_code})"
+                )
+        except Exception:
+            return "User doesn't have permission to access the resource."
+        
+    def raise_for_error(self, resp):
+        try:
+            resp.raise_for_status()
+        except (requests.HTTPError, requests.ConnectionError) as error:
+            try:
+                error_code = resp.status_code
 
-                message = "HTTP-error-code: {}, Error: {}".format(
-                    error_code,
-                    response_json.get(
-                        "error", response_json.get(
-                            "Title", response_json.get(
-                                "Detail", ERROR_CODE_EXCEPTION_MAPPING.get(
-                                    error_code, {}).get("message", "Unknown Error")
-                                ))))
+                # Handling status code 429 specially since the required information is present in the headers
+                if error_code == 429:
+                    resp_headers = resp.headers
+                    api_rate_limit_message = ERROR_CODE_EXCEPTION_MAPPING[429]["message"]
+                    message = "HTTP-error-code: 429, Error: {}. Hit limit {} - please retry after {} seconds. \nRemaining API calls for this day: {}".format(
+                        api_rate_limit_message,
+                        resp_headers.get("X-Rate-Limit-Problem"),
+                        resp_headers.get("Retry-After"),
+                        resp_headers.get("X-DayLimit-Remaining"),
+                    )
+                    LOGGER.warning(message)
 
-            exc = ERROR_CODE_EXCEPTION_MAPPING.get(error_code, {}).get("raise_exception", XeroError)
-            raise exc(message, resp) from None
+                    #Raise XeroTooManyInMinuteError exception if minute limit is reached
+                    # if resp_headers.get("X-Rate-Limit-Problem") == 'minute':
+                    raise XeroTooManyInMinuteError(message, resp) from None
+                # Handling status code 403 specially since response of API does not contain enough information
+                elif error_code == 403:
+                    api_message = self._get_accessible_tenants_info()
+                    message = f"HTTP-error-code: {error_code}, Error: {api_message}"
+                elif error_code == 401:
+                    api_message = ERROR_CODE_EXCEPTION_MAPPING[error_code]["message"]
+                    message = "HTTP-error-code: {}, Error: {}".format(error_code, api_message)
+                elif error_code == 504:
+                    message = "HTTP-error-code: 504, Error: Gateway Timeout"
+                    raise ReadTimeout(message)
+                else:
+                    # Forming a response message for raising custom exception
+                    try:
+                        response_json = resp.json()
+                    except Exception:
+                        response_json = {}
 
-        except (ValueError, TypeError):
-            raise XeroError(error) from None
+                    message = "HTTP-error-code: {}, Error: {}".format(
+                        error_code,
+                        response_json.get(
+                            "error", response_json.get(
+                                "Title", response_json.get(
+                                    "Detail", ERROR_CODE_EXCEPTION_MAPPING.get(
+                                        error_code, {}).get("message", "Unknown Error")
+                                    ))))
+
+                exc = ERROR_CODE_EXCEPTION_MAPPING.get(error_code, {}).get("raise_exception", XeroError)
+                raise exc(message, resp) from None
+
+            except (ValueError, TypeError):
+                raise XeroError(error) from None
