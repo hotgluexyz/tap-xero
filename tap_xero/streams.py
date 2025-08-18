@@ -232,9 +232,42 @@ class Journals(Stream):
     """The Journals endpoint is a special case. It has its own way of ordering
     and paging the data. See
     https://developer.xero.com/documentation/api/journals"""
+
+    def get_max_journal(self,ctx, offset=None):
+        
+        start = 0
+        end = 100000000
+        iterations = 1
+        starting_offset = 0
+        while start <= end:
+            print(f"start is {start} and end is {end}")
+            mid = (start + end) // 2
+            params = {"offset": mid}
+            response = _make_request(ctx, self.tap_stream_id, params)
+            #Check if journals are found in the response
+            journal_numbers = [entry.get('JournalNumber', 0) for entry in response]
+            if journal_numbers:
+                max_journal = max(journal_numbers)
+                #Adjust to 500k offset
+                starting_offset = max_journal - int(ctx.config.get("journal_lookback_range",499900))
+                if starting_offset < 0:
+                    starting_offset = 0
+                break    
+                
+            #Keep adjusting the offset and the search interval    
+            if end - start < 1000: #@TODO adjust it to desired offset e.g 500,000
+                break
+            elif mid < 1000:  
+                start = mid + 1
+            else:
+                end = mid - 1
+            logging.info(f"iteration for calculating Journal offset {iterations} completed")
+            iterations += 1    
+        return starting_offset
+
     def sync(self, ctx):
         bookmark = [self.tap_stream_id, self.bookmark_key]
-        journal_number = ctx.get_bookmark(bookmark) or 0
+        journal_number = ctx.get_bookmark(bookmark) or self.get_max_journal(ctx)
         while True:
             filter_options = {"offset": journal_number}
             if ctx.config.get("start_date"):
@@ -289,6 +322,7 @@ class Journals(Stream):
                         line = transformer.transform(line, lines_schema, metadata.to_map(line_mdata))
                         singer.write_record(lines_stream_id, line)
         self.metrics(records)
+    
 
 
 class LinkedTransactions(Stream):
