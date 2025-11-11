@@ -110,6 +110,9 @@ def sync(ctx):
         stream.sync(ctx)
     ctx.state["currently_syncing"] = None
     ctx.write_state()
+    
+    # Log rate limit info at end of sync
+    LOGGER.info(f"Sync completed. Day limit starting at: {ctx.client.daily_start_limit}. Day limit ending at: {ctx.client.rate_limit_day_remaining}. Number of requests made: {ctx.client.request_count}")
 
 
 

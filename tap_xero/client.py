@@ -223,6 +223,10 @@ class XeroClient():
         self.user_agent = config.get("user_agent")
         self.tenant_id = None
         self.access_token = None
+        self.request_count = 0
+        self.daily_start_limit = None
+        self.rate_limit_day_remaining = None
+        self.first_request_logged = False
 
     def refresh_credentials(self, config, config_path):
         LOGGER.info("Refreshing OAuth credentials")
@@ -269,6 +273,13 @@ class XeroClient():
         currencies_url = join(BASE_URL, "Currencies")
         request = requests.Request("GET", currencies_url, headers=headers)
         response = self.session.send(request.prepare())
+        # Track requests and extract rate limit headers
+        self.request_count += 1
+        self._extract_rate_limit_headers(response)
+        if not self.first_request_logged:
+            self.daily_start_limit = int(self.rate_limit_day_remaining) + 1 # +1 because we already made 1 request
+            LOGGER.info(f"Discover started. Day limit starting at: {self.daily_start_limit}. Day limit remaining: {self.rate_limit_day_remaining}, requests made: {self.request_count}")
+            self.first_request_logged = True
 
         if response.status_code != 200:
             self.raise_for_error(response)
@@ -310,6 +321,16 @@ class XeroClient():
         request = requests.Request("GET", url, headers=headers, params=params)
         response = self.session.send(request.prepare())
 
+        # Track requests and extract rate limit headers
+        self.request_count += 1
+        self._extract_rate_limit_headers(response)
+        
+        # Log rate limit info on first request (sync start)
+        if not self.first_request_logged:
+            self.daily_start_limit = int(self.rate_limit_day_remaining) + 1 # +1 because we already made 1 request
+            LOGGER.info(f"Sync started. Day limit starting at: {self.daily_start_limit}. Day limit remaining: {self.rate_limit_day_remaining}")
+            self.first_request_logged = True
+
         if response.status_code != 200:
             self.raise_for_error(response)
             return None
@@ -321,6 +342,12 @@ class XeroClient():
                 response_body = response_body.pop(xero_resource_name)
             return response_body
 
+    def _extract_rate_limit_headers(self, response):
+        """Extract rate limit information from response headers."""
+        headers = response.headers
+        # Xero API returns rate limit headers
+        self.rate_limit_day_remaining = headers.get("X-DayLimit-Remaining")
+
     def _get_accessible_tenants_info(self):
         """Retrieve accessible tenant information for 403 error messages."""
         headers = {
@@ -330,6 +357,14 @@ class XeroClient():
         
         try:
             tenants_response = requests.get(CONNECTIONS_URL, headers=headers)
+            # Track requests and extract rate limit headers
+            self.request_count += 1
+            self._extract_rate_limit_headers(tenants_response)
+            if not self.first_request_logged:
+                self.daily_start_limit = int(self.rate_limit_day_remaining) + 1 # +1 because we already made 1 request
+                LOGGER.info(f"Discover started. Day limit starting at: {self.daily_start_limit}. Day limit remaining: {self.rate_limit_day_remaining}, requests made: {self.request_count}")
+                self.first_request_logged = True
+
             if tenants_response.status_code == 200:
                 tenants_data = tenants_response.json()
                 tenant_ids = {tenant["tenantId"] for tenant in tenants_data}
