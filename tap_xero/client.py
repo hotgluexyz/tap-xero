@@ -273,6 +273,13 @@ class XeroClient():
         currencies_url = join(BASE_URL, "Currencies")
         request = requests.Request("GET", currencies_url, headers=headers)
         response = self.session.send(request.prepare())
+        # Track requests and extract rate limit headers
+        self.request_count += 1
+        self._extract_rate_limit_headers(response)
+        if not self.first_request_logged:
+            self.daily_start_limit = self.rate_limit_day_remaining + 1 # +1 because we already made 1 request
+            LOGGER.info(f"Sync started. Day limit starting at: {self.daily_start_limit}. Day limit remaining: {self.rate_limit_day_remaining}")
+            self.first_request_logged = True
 
         if response.status_code != 200:
             self.raise_for_error(response)
