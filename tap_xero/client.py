@@ -277,8 +277,8 @@ class XeroClient():
         self.request_count += 1
         self._extract_rate_limit_headers(response)
         if not self.first_request_logged:
-            self.daily_start_limit = self.rate_limit_day_remaining + 1 # +1 because we already made 1 request
-            LOGGER.info(f"Sync started. Day limit starting at: {self.daily_start_limit}. Day limit remaining: {self.rate_limit_day_remaining}")
+            self.daily_start_limit = int(self.rate_limit_day_remaining) + 1 # +1 because we already made 1 request
+            LOGGER.info(f"Discover started. Day limit starting at: {self.daily_start_limit}. Day limit remaining: {self.rate_limit_day_remaining}, requests made: {self.request_count}")
             self.first_request_logged = True
 
         if response.status_code != 200:
@@ -327,7 +327,7 @@ class XeroClient():
         
         # Log rate limit info on first request (sync start)
         if not self.first_request_logged:
-            self.daily_start_limit = self.rate_limit_day_remaining
+            self.daily_start_limit = int(self.rate_limit_day_remaining) + 1 # +1 because we already made 1 request
             LOGGER.info(f"Sync started. Day limit starting at: {self.daily_start_limit}. Day limit remaining: {self.rate_limit_day_remaining}")
             self.first_request_logged = True
 
@@ -357,6 +357,14 @@ class XeroClient():
         
         try:
             tenants_response = requests.get(CONNECTIONS_URL, headers=headers)
+            # Track requests and extract rate limit headers
+            self.request_count += 1
+            self._extract_rate_limit_headers(tenants_response)
+            if not self.first_request_logged:
+                self.daily_start_limit = int(self.rate_limit_day_remaining) + 1 # +1 because we already made 1 request
+                LOGGER.info(f"Discover started. Day limit starting at: {self.daily_start_limit}. Day limit remaining: {self.rate_limit_day_remaining}, requests made: {self.request_count}")
+                self.first_request_logged = True
+
             if tenants_response.status_code == 200:
                 tenants_data = tenants_response.json()
                 tenant_ids = {tenant["tenantId"] for tenant in tenants_data}
