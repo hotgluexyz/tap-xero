@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 import os
-import json
 import singer
-from singer import metadata, metrics, utils
+from singer import metadata, utils
 from singer.catalog import Catalog, CatalogEntry, Schema
 from tap_xero import streams as streams_
 from tap_xero.client import XeroClient

@@ -2,7 +2,6 @@ import tap_xero.client as client_
 import unittest
 import requests
 from unittest import mock
-import decimal
 import json
 
 
@@ -151,8 +150,8 @@ class TestFilterFunExceptionHandling(unittest.TestCase):
         xero_client.access_token = "123"
         xero_client.tenant_id = "123"
         try:
-            filter_func_exec = xero_client.filter(tap_stream_id)
-        except json.decoder.JSONDecodeError as e:
+            _ = xero_client.filter(tap_stream_id)
+        except json.decoder.JSONDecodeError:
             pass
 
         self.assertEqual(mocked_jsondecode_failing_request.call_count, 3)
@@ -168,8 +167,8 @@ class TestFilterFunExceptionHandling(unittest.TestCase):
         xero_client.access_token = "123"
         xero_client.tenant_id = "123"
         try:
-            filter_func_exec = xero_client.filter(tap_stream_id)
-        except json.decoder.JSONDecodeError as e:
+            _ = xero_client.filter(tap_stream_id)
+        except json.decoder.JSONDecodeError:
             pass
 
         self.assertEqual(mocked_jsondecode_successful_request.call_count, 1)
@@ -336,7 +335,7 @@ class TestFilterFunExceptionHandling(unittest.TestCase):
 
         try:
             # Verifying if the custom exception 'XeroTooManyError' is raised on receiving status code 429 with daily limit exceeded
-            filter_func_exec = xero_client.filter(tap_stream_id)
+            _ = xero_client.filter(tap_stream_id)
         except client_.XeroTooManyError as e:
             expected_error_message = "HTTP-error-code: 429, Error: The API rate limit for your organisation/application pairing has been exceeded. Please retry after 1000 seconds"
             
@@ -356,7 +355,7 @@ class TestFilterFunExceptionHandling(unittest.TestCase):
 
         try:
             # Verifying if the custom exception 'XeroTooManyInMinuteError' is raised on receiving status code 429 with minute limit exceeded
-            filter_func_exec = xero_client.filter(tap_stream_id)
+            _ = xero_client.filter(tap_stream_id)
         except client_.XeroTooManyInMinuteError as e:
             expected_error_message = "HTTP-error-code: 429, Error: The API rate limit for your organisation/application pairing has been exceeded. Please retry after 5 seconds"
             
@@ -374,8 +373,8 @@ class TestFilterFunExceptionHandling(unittest.TestCase):
         xero_client.access_token = "123"
         xero_client.tenant_id = "123"
         try:
-            filter_func_exec = xero_client.filter(tap_stream_id)
-        except (requests.HTTPError, client_.XeroTooManyError) as e:
+            _ = xero_client.filter(tap_stream_id)
+        except (requests.HTTPError, client_.XeroTooManyError):
             pass
 
         #Verify daily limit should not backoff
@@ -392,8 +391,8 @@ class TestFilterFunExceptionHandling(unittest.TestCase):
         xero_client.access_token = "123"
         xero_client.tenant_id = "123"
         try:
-            filter_func_exec = xero_client.filter(tap_stream_id)
-        except (requests.HTTPError, client_.XeroTooManyInMinuteError) as e:
+            _ = xero_client.filter(tap_stream_id)
+        except (requests.HTTPError, client_.XeroTooManyInMinuteError):
             pass
 
         self.assertEqual(mocked_failed_429_request_in_minute.call_count, 3)
@@ -408,8 +407,8 @@ class TestFilterFunExceptionHandling(unittest.TestCase):
         xero_client.access_token = "123"
         xero_client.tenant_id = "123"
         try:
-            filter_func_exec = xero_client.filter(tap_stream_id)
-        except (requests.HTTPError, client_.XeroInternalError) as e:
+            _ = xero_client.filter(tap_stream_id)
+        except (requests.HTTPError, client_.XeroInternalError):
             pass
 
         self.assertEqual(mocked_internalservererror_500_error.call_count, 3)
@@ -624,7 +623,7 @@ class TestCheckPlatformAccessBehavior(unittest.TestCase):
 
         try:
             xero_client.check_platform_access(config, config_path)
-        except (requests.HTTPError, client_.XeroTooManyError) as e:
+        except (requests.HTTPError, client_.XeroTooManyError):
             pass
 
         #Verify daily limit should not backoff
@@ -646,7 +645,7 @@ class TestCheckPlatformAccessBehavior(unittest.TestCase):
 
         try:
             xero_client.check_platform_access(config, config_path)
-        except (requests.HTTPError, client_.XeroTooManyInMinuteError) as e:
+        except (requests.HTTPError, client_.XeroTooManyInMinuteError):
             pass
 
         self.assertEqual(mocked_failed_429_request_in_minute.call_count, 3)
@@ -667,7 +666,7 @@ class TestCheckPlatformAccessBehavior(unittest.TestCase):
 
         try:
             xero_client.check_platform_access(config, config_path)
-        except (requests.HTTPError, client_.XeroInternalError) as e:
+        except (requests.HTTPError, client_.XeroInternalError):
             pass
 
         self.assertEqual(mocked_internalservererror_500_error.call_count, 3)
