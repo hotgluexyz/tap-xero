@@ -144,7 +144,7 @@ class ReportStream(Stream):
                 for row in records:
                     row["from_date"] = from_date
                     row["to_date"] = to_date
-                    if not row["BudgetID"] in previous_budgets:
+                    if row["BudgetID"] not in previous_budgets:
                         previous_budgets.add(row["BudgetID"])
                     else:
                         # Already processed, the API is returning same response for all date ranges

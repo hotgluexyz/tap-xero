@@ -1,6 +1,5 @@
 import tap_xero.streams as stream_
 import unittest
-import requests
 from unittest import mock
 
 class MockConfig:
@@ -41,7 +40,7 @@ class TestSupportArchivedContacts(unittest.TestCase):
 
         # ArchivedContacts parameter set to true in the MockConfig class
         ctx = MockConfig()
-        sync_resp = contacts_stream_execution.sync(ctx)
+        _ = contacts_stream_execution.sync(ctx)
 
         expected_filter_options = dict(since="2021-04-01", order="UpdatedDateUTC ASC", includeArchived="true", page=1)
 
@@ -60,7 +59,7 @@ class TestSupportArchivedContacts(unittest.TestCase):
 
         # Customer may also pass a boolean parameter for include_archived_contacts
         ctx.config["include_archived_contacts"] = True
-        sync_resp = contacts_stream_execution.sync(ctx)
+        _ = contacts_stream_execution.sync(ctx)
 
         expected_filter_options = dict(since="2021-04-01", order="UpdatedDateUTC ASC", includeArchived="true", page=1)
 
@@ -78,7 +77,7 @@ class TestSupportArchivedContacts(unittest.TestCase):
         ctx = MockConfig()
         # Setting the archived contacts parameter value to "false" to get only active contacts result
         ctx.config["include_archived_contacts"] = "false"
-        sync_resp = contacts_stream_execution.sync(ctx)
+        _ = contacts_stream_execution.sync(ctx)
 
         expected_filter_options = dict(since="2021-04-01", order="UpdatedDateUTC ASC", page=1)
 
@@ -95,7 +94,7 @@ class TestSupportArchivedContacts(unittest.TestCase):
         # ArchivedContacts parameter set to true in the MockConfig class. However, for other streams, this parameter should not be passed
         # while contacting Xero platform
         ctx = MockConfig()
-        sync_resp = contacts_stream_execution.sync(ctx)
+        _ = contacts_stream_execution.sync(ctx)
 
         expected_filter_options = dict(since="2021-04-01", order="UpdatedDateUTC ASC", page=1)
 
@@ -113,7 +112,7 @@ class TestSupportArchivedContacts(unittest.TestCase):
 
         # Deleting the 'include_archived_contacts' option from the config dictionary
         del ctx.config["include_archived_contacts"]
-        sync_resp = contacts_stream_execution.sync(ctx)
+        _ = contacts_stream_execution.sync(ctx)
 
         expected_filter_options = dict(since="2021-04-01", order="UpdatedDateUTC ASC", page=1)
 

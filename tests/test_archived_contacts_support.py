@@ -23,7 +23,7 @@ class TestArchivedContacts(XeroScenarioBase):
         return properties
 
     def get_records_from_xero_platform(self):
-        only_active_contacts = runner.run_check_job_and_check_status(self)
+        _ = runner.run_check_job_and_check_status(self)
 
         found_catalogs = menagerie.get_catalogs(self.conn_id)
         self.check_all_streams_in_catalogs(found_catalogs)
