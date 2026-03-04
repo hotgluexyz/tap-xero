@@ -1,0 +1,33 @@
+[tool.poetry]
+name = "tap-xero"
+version="2.2.12"
+description="Singer.io tap for extracting data from the Xero API"
+readme = "README.md"
+authors = ["hotglue <hello@hotglue.xyz>"]
+packages = [{ include = "tap_xero" }]
+keywords = [
+    "ELT",
+    "Xero",
+    "Singer",
+    "Singer-tap",
+]
+license = "Apache-2.0"
+
+
+[tool.poetry.dependencies]
+python = "<3.11,>=3.7.1"
+# Meltano Singer SDK
+singer-python = "5.9.0"
+requests = "2.29.0"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^6.2.5"
+tox = "^3.24.4"
+
+[tool.poetry.scripts]
+tap-xero = 'tap_xero:main'
+
+
+[build-system]
+requires = ["poetry-core>=1.0.8"]
+build-backend = "poetry.core.masonry.api"
