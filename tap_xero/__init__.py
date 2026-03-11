@@ -131,6 +131,7 @@ class TapXero(Tap):
         th.Property(
             "start_date",
             th.DateTimeType,
+            required=True,
             description="Earliest updatedAt timestamp to sync from.",
         ),
         th.Property("client_id", th.StringType, required=True),
@@ -155,5 +156,8 @@ class TapXero(Tap):
     def discover_streams(self):
         return []
 
-if __name__ == "__main__":
+def main():
     TapXero.cli()
+
+if __name__ == "__main__":
+    main()
