@@ -115,7 +115,7 @@ def sync(ctx):
 
 
 def _sdk_catalog_to_singer(sdk_catalog):
-    """Convert SDK Catalog to singer Catalog for use with existing sync/streams."""
+    """Convert Hotglue SDK Catalog to singer Catalog for use with existing sync/streams."""
     singer_streams = []
     for entry in sdk_catalog.streams:
         singer_streams.append(
@@ -160,26 +160,19 @@ class TapXero(Tap):
         print(catalog_text)
         return catalog_text
 
-    def sync_all(self):
+    def sync_all(self) -> None:
+        """Sync all streams.
+
+        Returns:
+            None
+        """
         config_path = str(self.config_file) if self.config_file else ""
-        if self.input_catalog is None:
-            LOGGER.info("Running sync without provided Catalog. Discovering.")
-            # discover_ctx = Context(dict(self.config), {}, None, config_path)
-            # discover_ctx.check_platform_access()
-            # catalog = discover(discover_ctx)
-            catalog = discover(Context(dict(self.config), {}, {}, config_path))
-        else:
-            catalog = _sdk_catalog_to_singer(self.catalog)
-        ctx = Context(dict(self.config), self.state, catalog, config_path)
-        sync(ctx)
+        catalog = _sdk_catalog_to_singer(self.catalog)
+        sync(Context(dict(self.config), self.state, catalog, config_path))
 
     def discover_streams(self):
         ''' Just to avoid raise NotImplementedError'''
         return []
-
-#run_discovery
-# sync_all
-
 
 if __name__ == "__main__":
     TapXero.cli()
