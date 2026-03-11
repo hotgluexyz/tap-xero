@@ -141,7 +141,7 @@ class TapXero(Tap):
     ).to_dict()
 
     def run_discovery(self) -> str:
-        config_path = str(self.config_file) if self.config_file else ""
+        config_path = str(self.config_file)
         catalog = discover(Context(dict(self.config), {}, {}, config_path))
         catalog_dict = {"streams": [s.to_dict() for s in catalog.streams]}
         catalog_text = json.dumps(catalog_dict, indent=2)
@@ -149,7 +149,7 @@ class TapXero(Tap):
         return catalog_text
 
     def sync_all(self) -> None:
-        config_path = str(self.config_file) if self.config_file else ""
+        config_path = str(self.config_file)
         catalog = _sdk_catalog_to_singer(self.catalog)
         sync(Context(dict(self.config), self.state, catalog, config_path))
 
