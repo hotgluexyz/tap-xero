@@ -147,11 +147,14 @@ class TapXero(Tap):
         th.Property("refresh_token", th.StringType, required=True),
     ).to_dict()
 
-    def run_discovery(self):
+    def run_discovery(self) -> str:
+        """Write the catalog json to STDOUT and return as a string.
+
+        Returns:
+            The catalog as a string of JSON.
+        """
         config_path = str(self.config_file) if self.config_file else ""
-        ctx = Context(dict(self.config), {}, None, config_path)
-        ctx.check_platform_access()
-        catalog = discover(ctx)
+        catalog = discover(Context(dict(self.config), {}, {}, config_path))
         catalog_dict = {"streams": [s.to_dict() for s in catalog.streams]}
         catalog_text = json.dumps(catalog_dict, indent=2)
         print(catalog_text)
@@ -161,9 +164,10 @@ class TapXero(Tap):
         config_path = str(self.config_file) if self.config_file else ""
         if self.input_catalog is None:
             LOGGER.info("Running sync without provided Catalog. Discovering.")
-            discover_ctx = Context(dict(self.config), {}, None, config_path)
-            discover_ctx.check_platform_access()
-            catalog = discover(discover_ctx)
+            # discover_ctx = Context(dict(self.config), {}, None, config_path)
+            # discover_ctx.check_platform_access()
+            # catalog = discover(discover_ctx)
+            catalog = discover(Context(dict(self.config), {}, {}, config_path))
         else:
             catalog = _sdk_catalog_to_singer(self.catalog)
         ctx = Context(dict(self.config), self.state, catalog, config_path)
