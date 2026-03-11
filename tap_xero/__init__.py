@@ -10,14 +10,6 @@ from tap_xero.context import Context
 from hotglue_singer_sdk import typing as th
 from hotglue_singer_sdk.tap_base import Tap
 
-# REQUIRED_CONFIG_KEYS = [
-#     "start_date",
-#     "client_id",
-#     "client_secret",
-#     "tenant_id",
-#     "refresh_token",
-
-# ]
 
 LOGGER = singer.get_logger()
 
@@ -115,7 +107,7 @@ def sync(ctx):
 
 
 def _sdk_catalog_to_singer(sdk_catalog):
-    """Convert Hotglue SDK Catalog to singer Catalog for use with existing sync/streams."""
+    """Convert Hotglue Singer SDK Catalog to Singer Catalog for use with existing sync/streams."""
     singer_streams = []
     for entry in sdk_catalog.streams:
         singer_streams.append(
@@ -131,7 +123,7 @@ def _sdk_catalog_to_singer(sdk_catalog):
 
 
 class TapXero(Tap):
-    """Marketo Engage tap."""
+    """Xero Engage tap."""
 
     name = "tap-xero"
 
@@ -148,11 +140,6 @@ class TapXero(Tap):
     ).to_dict()
 
     def run_discovery(self) -> str:
-        """Write the catalog json to STDOUT and return as a string.
-
-        Returns:
-            The catalog as a string of JSON.
-        """
         config_path = str(self.config_file) if self.config_file else ""
         catalog = discover(Context(dict(self.config), {}, {}, config_path))
         catalog_dict = {"streams": [s.to_dict() for s in catalog.streams]}
@@ -161,17 +148,11 @@ class TapXero(Tap):
         return catalog_text
 
     def sync_all(self) -> None:
-        """Sync all streams.
-
-        Returns:
-            None
-        """
         config_path = str(self.config_file) if self.config_file else ""
         catalog = _sdk_catalog_to_singer(self.catalog)
         sync(Context(dict(self.config), self.state, catalog, config_path))
 
     def discover_streams(self):
-        ''' Just to avoid raise NotImplementedError'''
         return []
 
 if __name__ == "__main__":
