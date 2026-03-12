@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import json
 import os
 import singer
 from singer import metadata, utils
@@ -6,15 +7,9 @@ from singer.catalog import Catalog, CatalogEntry, Schema
 from tap_xero import streams as streams_
 from tap_xero.client import XeroClient
 from tap_xero.context import Context
+from hotglue_singer_sdk import typing as th
+from hotglue_singer_sdk.tap_base import Tap
 
-REQUIRED_CONFIG_KEYS = [
-    "start_date",
-    "client_id",
-    "client_secret",
-    "tenant_id",
-    "refresh_token",
-
-]
 
 LOGGER = singer.get_logger()
 
@@ -111,28 +106,58 @@ def sync(ctx):
     ctx.write_state()
 
 
+def _sdk_catalog_to_singer(sdk_catalog):
+    """Convert Hotglue Singer SDK Catalog to Singer Catalog for use with existing sync/streams."""
+    singer_streams = []
+    for entry in sdk_catalog.streams:
+        singer_streams.append(
+            CatalogEntry(
+                stream=entry.tap_stream_id,
+                tap_stream_id=entry.tap_stream_id,
+                key_properties=entry.key_properties or [],
+                schema=Schema.from_dict(entry.schema.to_dict()),
+                metadata=entry.metadata.to_list(),
+            )
+        )
+    return Catalog(singer_streams)
 
-def main_impl():
-    args = utils.parse_args(REQUIRED_CONFIG_KEYS)
-    if args.discover:
-        discover(Context(args.config, {}, {}, args.config_path)).dump()
-        print()
-    else:
-        if args.catalog:
-            catalog = args.catalog
-        else:
-            LOGGER.info("Running sync without provided Catalog. Discovering.")
-            catalog = discover(Context(args.config, {}, {}, args.config_path))
 
-        sync(Context(args.config, args.state, catalog, args.config_path))
+class TapXero(Tap):
+    """Xero Engage tap."""
+
+    name = "tap-xero"
+
+    config_jsonschema = th.PropertiesList(
+        th.Property(
+            "start_date",
+            th.DateTimeType,
+            required=True,
+            description="Earliest updatedAt timestamp to sync from.",
+        ),
+        th.Property("client_id", th.StringType, required=True),
+        th.Property("client_secret", th.StringType, required=True),
+        th.Property("tenant_id", th.StringType, required=True),
+        th.Property("refresh_token", th.StringType, required=True),
+    ).to_dict()
+
+    def run_discovery(self) -> str:
+        config_path = str(self.config_file)
+        catalog = discover(Context(dict(self.config), {}, {}, config_path))
+        catalog_dict = {"streams": [s.to_dict() for s in catalog.streams]}
+        catalog_text = json.dumps(catalog_dict, indent=2)
+        print(catalog_text)
+        return catalog_text
+
+    def sync_all(self) -> None:
+        config_path = str(self.config_file)
+        catalog = _sdk_catalog_to_singer(self.catalog)
+        sync(Context(dict(self.config), self.state, catalog, config_path))
+
+    def discover_streams(self):
+        return []
 
 def main():
-    try:
-        main_impl()
-    except Exception as exc:
-        LOGGER.critical(exc)
-        raise exc
-
+    TapXero.cli()
 
 if __name__ == "__main__":
     main()
