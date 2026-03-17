@@ -311,7 +311,7 @@ class XeroClient():
 
                 if tenant_is_accessible:
                     return (
-                        f"Spotty 403: User have permission to access the resource. Retrying...",
+                        "Spotty 403: User have permission to access the resource. Retrying...",
                         True
                     )
                 else:
