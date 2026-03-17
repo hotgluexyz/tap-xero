@@ -9,7 +9,7 @@ import backoff
 from . import transform
 from dateutil.parser import parse
 from dateutil.relativedelta import relativedelta
-from tap_xero.client import XeroUnauthorizedError
+from tap_xero.client import XeroUnauthorizedError, XeroTransientForbiddenError
 from http.client import RemoteDisconnected
 from requests.exceptions import ConnectionError,ReadTimeout,ChunkedEncodingError
 from urllib3.exceptions import ProtocolError
@@ -49,6 +49,10 @@ def _make_request(ctx, tap_stream_name, filter_options=None, attempts=0):
             raise e
         ctx.refresh_credentials()
         return _make_request(ctx, tap_stream_name, filter_options, attempts + 1)
+    except XeroTransientForbiddenError as e:
+        # Backoff exhausted in client; surface as 403 so UI/customer see a consistent 403
+        from tap_xero.client import XeroForbiddenError
+        raise XeroForbiddenError(e.message, e.response) from e
     except HTTPError as e:
         if e.response.status_code == 401:
             if attempts == 1:
