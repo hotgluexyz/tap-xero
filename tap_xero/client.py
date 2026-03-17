@@ -311,7 +311,9 @@ class XeroClient():
 
                 if tenant_is_accessible:
                     return (
-                        "Spotty 403: User have permission to access the resource. Retrying...",
+                        "Xero returned 403 for this resource even though the tenant is in your "
+                        "accessible tenants. This may be a temporary API issue, or your organisation "
+                        "may not have access to this report or stream; try again later or check Xero status.",
                         True
                     )
                 else:
