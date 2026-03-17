@@ -40,6 +40,9 @@ class XeroUnauthorizedError(XeroError):
 class XeroForbiddenError(XeroError):
     pass
 
+class XeroTransientForbiddenError(XeroForbiddenError):
+    """403 with requested tenant in accessible list — likely transient; retry with backoff."""
+    pass
 
 class XeroNotFoundError(XeroError):
     pass
@@ -249,7 +252,7 @@ class XeroClient():
         """
         LOGGER.info("Error detected communicating with Xero, triggering backoff: %d try", details.get("tries"))
 
-    @backoff.on_exception(backoff.expo, (json.decoder.JSONDecodeError, XeroInternalError,RemoteDisconnected,ConnectionError,ReadTimeout,ChunkedEncodingError,ProtocolError), on_backoff=log_backoff_attempt, max_tries=5, factor=5)
+    @backoff.on_exception(backoff.expo, (json.decoder.JSONDecodeError, XeroInternalError, XeroTransientForbiddenError, RemoteDisconnected,ConnectionError,ReadTimeout,ChunkedEncodingError,ProtocolError), on_backoff=log_backoff_attempt, max_tries=5, factor=5)
     @backoff.on_exception(retry_after_wait_gen, XeroTooManyInMinuteError, giveup=is_not_status_code_fn([429]), jitter=None, max_tries=3)
     def filter(self, tap_stream_id, since=None, **params):
         xero_resource_name = tap_stream_id.title().replace("_", "")
@@ -287,8 +290,11 @@ class XeroClient():
             return response_body
 
 
-    def _get_accessible_tenants_info(self):
-        """Retrieve accessible tenant information for 403 error messages."""
+    def _get_accessible_tenants_info(self) -> tuple[str, bool]:
+        """Retrieve accessible tenant information for 403 error messages.
+        Returns (message, tenant_is_accessible). tenant_is_accessible is True only when
+        the requested tenant is in the accessible list (transient 403); else False.
+        """
         headers = {
             "Accept": "application/json",
             "Authorization": "Bearer " + self.access_token,
@@ -301,19 +307,28 @@ class XeroClient():
                 tenant_ids = {tenant["tenantId"] for tenant in tenants_data}
                 requested_tenant = self.tenant_id or "<unknown>"
                 accessible_tenants = ', '.join(tenant_ids) if tenant_ids else 'None'
-                
-                return (
-                    f"User doesn't have permission to access the resource. "
-                    f"Requested tenant: {requested_tenant}. "
-                    f"Accessible tenants: {accessible_tenants}."
-                )
+                tenant_is_accessible = requested_tenant in tenant_ids
+
+                if tenant_is_accessible:
+                    return (
+                        f"Spotty 403: User have permission to access the resource. Retrying...",
+                        True
+                    )
+                else:
+                    return (
+                        f"User doesn't have permission to access the resource. "
+                        f"Requested tenant: {requested_tenant}. "
+                        f"Accessible tenants: {accessible_tenants}.",
+                        False
+                    )
             else:
                 return (
                     f"User doesn't have permission to access the resource. "
-                    f"(Failed to retrieve accessible tenants: {tenants_response.status_code})"
+                    f"(Failed to retrieve accessible tenants: {tenants_response.status_code})",
+                    False
                 )
         except Exception:
-            return "User doesn't have permission to access the resource."
+            return ("User doesn't have permission to access the resource.", False)
 
     def raise_for_error(self,resp):
         try:
@@ -339,8 +354,10 @@ class XeroClient():
                     raise XeroTooManyInMinuteError(message, resp) from None
                 # Handling status code 403 specially since response of API does not contain enough information
                 elif error_code == 403:
-                    api_message = self._get_accessible_tenants_info()
+                    api_message, tenant_is_accessible = self._get_accessible_tenants_info()
                     message = f"HTTP-error-code: {error_code}, Error: {api_message}"
+                    if tenant_is_accessible:
+                        raise XeroTransientForbiddenError(message, resp) from None
                 elif error_code == 401:
                     api_message = ERROR_CODE_EXCEPTION_MAPPING[error_code]["message"]
                     message = "HTTP-error-code: {}, Error: {}".format(error_code, api_message)
