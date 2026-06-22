@@ -9,6 +9,7 @@ from tap_xero.client import XeroClient
 from tap_xero.context import Context
 from hotglue_singer_sdk import typing as th
 from hotglue_singer_sdk.tap_base import Tap
+from hotglue_singer_sdk.authenticators import OAuthAuthenticator
 
 
 LOGGER = singer.get_logger()
@@ -122,6 +123,21 @@ def _sdk_catalog_to_singer(sdk_catalog):
     return Catalog(singer_streams)
 
 
+class XeroOAuthAuthenticator(OAuthAuthenticator):
+    """OAuth authenticator that refreshes Xero access tokens via the refresh-token grant."""
+
+    @property
+    def oauth_request_body(self) -> dict:
+        return {
+            "grant_type": "refresh_token",
+            "refresh_token": self.config["refresh_token"],
+        }
+
+    def request_auth(self):
+        # Xero requires Basic Auth (client_id:client_secret) on the token endpoint
+        return (self.config["client_id"], self.config["client_secret"])
+
+
 class TapXero(Tap):
     """Xero Engage tap."""
 
@@ -155,6 +171,10 @@ class TapXero(Tap):
 
     def discover_streams(self):
         return []
+
+    @classmethod
+    def access_token_support(cls, connector=None):
+        return (XeroOAuthAuthenticator, "https://identity.xero.com/connect/token")
 
 def main():
     TapXero.cli()
