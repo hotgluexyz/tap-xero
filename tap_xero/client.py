@@ -1,4 +1,3 @@
-from base64 import b64encode
 import re
 import json
 import decimal
@@ -15,11 +14,13 @@ import singer
 from http.client import RemoteDisconnected
 from requests.exceptions import ConnectionError,ReadTimeout,ChunkedEncodingError
 from urllib3.exceptions import ProtocolError
+from hotglue_singer_sdk.authenticators import OAuthAuthenticator
 
 LOGGER = singer.get_logger()
 
 BASE_URL = "https://api.xero.com/api.xro/2.0"
 CONNECTIONS_URL = "https://api.xero.com/connections"
+XERO_TOKEN_ENDPOINT = "https://identity.xero.com/connect/token"
 
 
 class XeroError(Exception):
@@ -188,39 +189,64 @@ def retry_after_wait_gen():
         LOGGER.info("API rate limit exceeded -- sleeping for %s seconds", sleep_time_str)
         yield math.floor(float(sleep_time_str))
 
+class XeroOAuthAuthenticator(OAuthAuthenticator):
+    """OAuth authenticator that refreshes Xero access tokens via the refresh-token grant."""
+
+    @property
+    def oauth_request_body(self) -> dict:
+        return {
+            "grant_type": "refresh_token",
+            "refresh_token": self.config["refresh_token"],
+        }
+
+    def request_auth(self):
+        # Xero requires Basic Auth (client_id:client_secret) on the token endpoint
+        return (self.config["client_id"], self.config["client_secret"])
+
+
+class _AuthContext:
+    """Adapts ``(config, config_path)`` to the stream/``_tap`` interface that the
+    SDK ``OAuthAuthenticator`` expects, so the client can use it without a real tap."""
+
+    def __init__(self, config, config_path):
+        self._config = config
+        self.config = config
+        self.config_file = config_path
+        self.logger = LOGGER
+        self.name = config.get("user_agent") or "tap-xero"
+        self.tap_name = self.name
+        self._tap = self
+
+
 class XeroClient():
-    def __init__(self, config):
+    def __init__(self, config, config_path=None):
         self.session = requests.Session()
         self.user_agent = config.get("user_agent")
-        self.tenant_id = None
+        self.tenant_id = config.get("tenant_id")
         self.access_token = None
+        self._config = config
+        self._config_path = config_path
+        self._authenticator = None
+
+    def _auth(self, config=None, config_path=None):
+        if config is not None:
+            self._config = config
+        if config_path is not None:
+            self._config_path = config_path
+        if self._authenticator is None:
+            self._authenticator = XeroOAuthAuthenticator(
+                stream=_AuthContext(self._config, self._config_path or None),
+                auth_endpoint=XERO_TOKEN_ENDPOINT,
+                config_file=self._config_path or None,
+            )
+        return self._authenticator
 
     def refresh_credentials(self, config, config_path):
         LOGGER.info("Refreshing OAuth credentials")
-        header_token = b64encode((config["client_id"] + ":" + config["client_secret"]).encode('utf-8'))
-
-        headers = {
-            "Authorization": "Basic " + header_token.decode('utf-8'),
-            "Content-Type": "application/x-www-form-urlencoded"
-        }
-
-        post_body = {
-            "grant_type": "refresh_token",
-            "refresh_token": config["refresh_token"],
-        }
-        resp = self.session.post("https://identity.xero.com/connect/token", headers=headers, data=post_body)
-
-        if resp.status_code != 200:
-            self.raise_for_error(resp)
-        else:
-            resp = resp.json()
-            LOGGER.info(f"Completed refresh of OAuth tokens. response={resp}")
-
-            # Write to config file
-            config['refresh_token'] = resp["refresh_token"]
-            update_config_file(config, config_path)
-            self.access_token = resp["access_token"]
-            self.tenant_id = config['tenant_id']
+        authenticator = self._auth(config, config_path)
+        authenticator.update_access_token()
+        self.access_token = authenticator.access_token
+        self.tenant_id = config["tenant_id"]
 
 
     @backoff.on_exception(backoff.expo, (json.decoder.JSONDecodeError, XeroInternalError,RemoteDisconnected,ConnectionError,ReadTimeout,ChunkedEncodingError,ProtocolError), max_tries=3)
