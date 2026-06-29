@@ -5,7 +5,7 @@ import singer
 from singer import metadata, utils
 from singer.catalog import Catalog, CatalogEntry, Schema
 from tap_xero import streams as streams_
-from tap_xero.client import XeroClient
+from tap_xero.client import XeroClient, XeroOAuthAuthenticator, XERO_TOKEN_ENDPOINT
 from tap_xero.context import Context
 from hotglue_singer_sdk import typing as th
 from hotglue_singer_sdk.tap_base import Tap
@@ -155,6 +155,10 @@ class TapXero(Tap):
 
     def discover_streams(self):
         return []
+
+    @classmethod
+    def access_token_support(cls, connector=None):
+        return (XeroOAuthAuthenticator, XERO_TOKEN_ENDPOINT)
 
 def main():
     TapXero.cli()

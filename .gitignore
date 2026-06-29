@@ -100,3 +100,4 @@ config.json
 
 rsa-key
 tags
+.venv/
