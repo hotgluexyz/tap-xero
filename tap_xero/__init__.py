@@ -13,6 +13,32 @@ from hotglue_singer_sdk.tap_base import Tap
 
 LOGGER = singer.get_logger()
 
+# DISPLAY list for the connector landing page, not a support contract.
+# Sourced from tap_xero/streams.py's all_streams registry. Runtime discovery
+# remains authoritative; this list is not validated against it.
+COMMON_XERO_OBJECTS = [
+    "accounts",
+    "bank_transactions",
+    "bank_transfers",
+    "contacts",
+    "credit_notes",
+    "currencies",
+    "employees",
+    "expense_claims",
+    "invoices",
+    "items",
+    "journals",
+    "manual_journals",
+    "overpayments",
+    "payments",
+    "prepayments",
+    "purchase_orders",
+    "quotes",
+    "receipts",
+    "repeating_invoices",
+    "tax_rates",
+]
+
 BAD_CREDS_MESSAGE = (
     "Failed to refresh OAuth token using the credentials from both the config and S3. "
     "The token might need to be reauthorized from the integration's properties "
@@ -126,6 +152,8 @@ class TapXero(Tap):
     """Xero Engage tap."""
 
     name = "tap-xero"
+    dynamic_catalog = True
+    static_stream_names = COMMON_XERO_OBJECTS
 
     config_jsonschema = th.PropertiesList(
         th.Property(
