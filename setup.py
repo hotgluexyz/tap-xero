@@ -9,7 +9,7 @@ setup(name="tap-xero",
       classifiers=["Programming Language :: Python :: 3 :: Only"],
       py_modules=["tap_xero"],
       install_requires=[
-          "hotglue-singer-sdk>=1.0.13,<2.0.0",
+          "hotglue-singer-sdk>=1.0.50,<2.0.0",
           "requests==2.29.0",
       ],
       extras_require={
