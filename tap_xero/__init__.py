@@ -13,10 +13,7 @@ from hotglue_singer_sdk.tap_base import Tap
 
 LOGGER = singer.get_logger()
 
-# DISPLAY list for the connector landing page, not a support contract.
-# Sourced from tap_xero/streams.py's all_streams registry. Runtime discovery
-# remains authoritative; this list is not validated against it.
-COMMON_XERO_OBJECTS = [
+DISPLAY_ONLY_STREAM_NAMES = [
     "accounts",
     "bank_transactions",
     "bank_transfers",
@@ -153,7 +150,7 @@ class TapXero(Tap):
 
     name = "tap-xero"
     dynamic_catalog = True
-    static_stream_names = COMMON_XERO_OBJECTS
+    static_stream_names = DISPLAY_ONLY_STREAM_NAMES
 
     config_jsonschema = th.PropertiesList(
         th.Property(
